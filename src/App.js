@@ -24,7 +24,6 @@ import Equipmentc from './pages/equipmentCategory';
 import Userlevel from './pages/condition';
 import VehicleModel from './pages/vehiclemodel';
 import PersonnelDashboard from './pages/PersonelDashboard';
-import ReleaseAndReturn from './pages/release&return';
 import ViewReserve from './page_user/viewReserve';
 import Profile from './page_user/profile'
 import Calendar from './pages/calendar';
@@ -81,7 +80,6 @@ const App = () => {
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/viewReserve" element={<ViewReserve />} />                      
                         <Route path="/gsd" element={<Logins />} />
-                        <Route path="/release&return" element={<ReleaseAndReturn />} />
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/departments" element={<Departments />} />
                         <Route path="/vehiclemodel" element={<VehicleModel />} />

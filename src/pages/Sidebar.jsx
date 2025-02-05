@@ -1,19 +1,37 @@
-import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import React, { useState, useEffect, createContext, useContext, useMemo, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   FaSignOutAlt, FaTachometerAlt, FaCar, FaCog, FaFileAlt, FaHeadset,
   FaChevronDown, FaBars, FaHome, FaTools, FaUserCircle, FaFolder,
-  FaCalendarAlt, FaChartBar
+  FaCalendarAlt, FaChartBar, FaClipboardList  // Add this import
 } from 'react-icons/fa';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
 import { Popover } from '@headlessui/react';
+import { Modal, Tooltip } from 'antd';  // Add this import
+import Profile from './profile';  // Add this import
+import { useSwipeable } from 'react-swipeable'; // Add this import
 
 const SidebarContext = createContext();
 
 const sidebarVariants = {
   open: { width: '16rem' },
   closed: { width: '4rem' },
+};
+
+// Add new popover variants
+const popoverVariants = {
+  hidden: { opacity: 0, x: -10 },
+  visible: { 
+    opacity: 1, 
+    x: 0, 
+    transition: { duration: 0.2 } 
+  }
+};
+
+const mobileOverlayVariants = {
+  open: { opacity: 0.5 },
+  closed: { opacity: 0 },
 };
 
 const Sidebar = () => {
@@ -30,6 +48,15 @@ const Sidebar = () => {
   const [notifications, setNotifications] = useState([]);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [systemStatus, setSystemStatus] = useState('online');
+  const [isProfileModalVisible, setIsProfileModalVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Add swipe handlers
+  const swipeHandlers = useSwipeable({
+    onSwipedLeft: () => isMobile && setSidebarOpen(false),
+    onSwipedRight: () => isMobile && setSidebarOpen(true),
+    trackMouse: false
+  });
 
   const name = localStorage.getItem('name') || 'Admin User';
   const user_level_id = localStorage.getItem('user_level_id');
@@ -51,7 +78,9 @@ const Sidebar = () => {
   useEffect(() => {
     setActiveItem(location.pathname);
     const handleResize = () => {
-      setSidebarOpen(window.innerWidth >= 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      setSidebarOpen(!mobile);
     };
     window.addEventListener('resize', handleResize);
     handleResize();
@@ -80,6 +109,14 @@ const Sidebar = () => {
     window.location.reload();
   };
 
+  const showProfileModal = () => {
+    setIsProfileModalVisible(true);
+  };
+
+  const handleProfileModalClose = () => {
+    setIsProfileModalVisible(false);
+  };
+
   const contextValue = useMemo(() => ({ isSidebarOpen }), [isSidebarOpen]);
 
   const formattedTime = format(currentTime, 'h:mm:ss a');
@@ -87,15 +124,25 @@ const Sidebar = () => {
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <div className={`flex h-screen ${isDarkMode ? 'dark' : ''}`}>
+      <div className="flex h-screen relative" {...swipeHandlers}>
+        {/* Mobile overlay backdrop */}
+        {isMobile && isSidebarOpen && (
+          <motion.div
+            initial="closed"
+            animate="open"
+            exit="closed"
+            variants={mobileOverlayVariants}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 bg-black z-30"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         <motion.aside
-          initial="open"
+          initial={false}
           animate={isSidebarOpen ? "open" : "closed"}
           variants={sidebarVariants}
           transition={{ duration: 0.3, type: 'tween' }}
-          className={`fixed md:relative h-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-xl flex flex-col z-40 ${
-            isSidebarOpen ? 'w-64' : 'w-16'
-          } transition-all duration-300 ease-in-out`}
+          className={`fixed md:relative h-full bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 shadow-xl flex flex-col z-40 transform ${isMobile ? 'translate-x-0' : ''} ${isSidebarOpen ? 'w-64' : 'w-16'} transition-all duration-300 ease-in-out`}
         >
           <div className="flex items-center justify-between p-4 border-b border-green-200">
             <AnimatePresence>
@@ -156,7 +203,12 @@ const Sidebar = () => {
               )}
 
               {canAccessMenu('viewReservation') && (
-                <SidebarSubItem icon={FaFileAlt} text="Records" link="/record" active={activeItem === '/record'} />
+                <SidebarItem 
+                  icon={FaClipboardList} 
+                  text="Records" 
+                  link="/record" 
+                  active={activeItem === '/record'} 
+                />
               )}
             </nav>
           </div>
@@ -187,7 +239,7 @@ const Sidebar = () => {
                   
                   <div className="p-2">
                     <button 
-                      onClick={() => navigate('/profile1')}
+                      onClick={showProfileModal}
                       className="w-full text-left px-4 py-2 hover:bg-green-50 text-gray-700 rounded flex items-center space-x-2"
                     >
                       <FaUserCircle />
@@ -213,6 +265,21 @@ const Sidebar = () => {
             </Popover>
           </div>
         </motion.aside>
+        <Profile 
+          open={isProfileModalVisible} 
+          onClose={handleProfileModalClose}
+        />
+        {/* Mobile close button */}
+        {isMobile && isSidebarOpen && (
+          <button
+            className="fixed top-4 right-4 z-50 p-2 rounded-full bg-white shadow-lg"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
     </SidebarContext.Provider>
   );
@@ -221,30 +288,29 @@ const Sidebar = () => {
 // Memoize the SidebarItem component
 const SidebarItem = React.memo(({ icon: Icon, text, link, active }) => {
   const { isSidebarOpen } = useContext(SidebarContext);
+  const isMobile = window.innerWidth < 768;
   
-  return (
+  const content = (
     <Link 
       to={link} 
-      className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
-        active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
-        'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
-      }`}
-      aria-current={active ? 'page' : undefined}
+      className={`
+        flex items-center space-x-3 p-3 rounded-lg transition-colors
+        touch-manipulation // Improve touch target size
+        ${active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
+        'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'}
+      `}
     >
       <Icon className={`text-xl ${active ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`} />
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="font-medium"
-          >
-            {text}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      {isSidebarOpen && (
+        <motion.span className="font-medium">{text}</motion.span>
+      )}
     </Link>
+  );
+
+  return isMobile || isSidebarOpen ? content : (
+    <Tooltip placement="right" title={text}>
+      {content}
+    </Tooltip>
   );
 });
 
@@ -252,40 +318,80 @@ const SidebarItem = React.memo(({ icon: Icon, text, link, active }) => {
 const SidebarDropdown = React.memo(({ icon: Icon, text, active, children }) => {
   const [isOpen, setIsOpen] = useState(false);
   const { isSidebarOpen } = useContext(SidebarContext);
+  const dropdownRef = useRef(null);
+  const buttonRef = useRef(null);
+  const isMobile = window.innerWidth < 768;
 
-  return (
-    <div>
+  const handleClickOutside = useCallback((event) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(event.target) &&
+        buttonRef.current && !buttonRef.current.contains(event.target)) {
+      setIsOpen(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [handleClickOutside]);
+
+  const getPopoverPosition = () => {
+    if (isMobile) {
+      return {
+        position: 'fixed',
+        left: isSidebarOpen ? '16rem' : '4rem',
+        top: buttonRef.current?.getBoundingClientRect().top ?? 0,
+      };
+    }
+    return {};
+  };
+
+  const dropdownContent = (
+    <div className="relative" ref={dropdownRef}>
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className={`w-full flex items-center justify-between p-2 rounded-lg transition-colors ${
-          active ? 'bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-200' : 
-          'text-gray-600 dark:text-gray-300 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
+          active ? 'bg-green-100 text-green-700' : 
+          'text-gray-600 hover:bg-green-50 hover:text-green-600'
         }`}
-        aria-expanded={isOpen}
       >
         <div className="flex items-center space-x-3">
           <Icon className={`text-xl ${active ? 'text-green-600' : 'text-gray-400'}`} />
-          <AnimatePresence>
-            {isSidebarOpen && (
-              <motion.span
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="font-medium"
-              >
-                {text}
-              </motion.span>
-            )}
-          </AnimatePresence>
+          {isSidebarOpen && <span className="font-medium">{text}</span>}
         </div>
-        <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''} text-gray-400`} />
+        {isSidebarOpen && (
+          <FaChevronDown className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        )}
       </button>
-      {isOpen && (
-        <div className="ml-4 mt-2 space-y-2" role="menu">
-          {children}
-        </div>
-      )}
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            variants={popoverVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+            className={`
+              fixed
+              ${isSidebarOpen ? 'left-64' : 'left-16'}
+              z-[100] bg-white rounded-lg shadow-lg border border-gray-200
+              min-w-[200px]
+            `}
+            style={getPopoverPosition()}
+          >
+            <div className="py-2">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
+  );
+
+  return isSidebarOpen ? dropdownContent : (
+    <Tooltip placement="right" title={text}>
+      {dropdownContent}
+    </Tooltip>
   );
 });
 
@@ -293,31 +399,20 @@ const SidebarDropdown = React.memo(({ icon: Icon, text, active, children }) => {
 const SidebarSubItem = React.memo(({ icon: Icon, text, link, active }) => {
   const { isSidebarOpen } = useContext(SidebarContext);
   
-  return (
+  const content = (
     <Link 
       to={link} 
       className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
         active ? 'bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-300' : 
         'text-gray-500 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900 hover:text-green-600 dark:hover:text-green-300'
       }`}
-      role="menuitem"
-      aria-current={active ? 'page' : undefined}
     >
       <Icon className={`text-sm ${active ? 'text-green-500' : 'text-gray-400'}`} />
-      <AnimatePresence>
-        {isSidebarOpen && (
-          <motion.span
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="text-sm"
-          >
-            {text}
-          </motion.span>
-        )}
-      </AnimatePresence>
+      <span className="text-sm whitespace-nowrap">{text}</span>
     </Link>
   );
+
+  return content;
 });
 
 export default Sidebar;

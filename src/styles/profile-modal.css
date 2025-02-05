@@ -1,0 +1,12 @@
+.profile-modal .ant-modal-content {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.profile-modal .ant-modal-body {
+  padding: 0;
+}
+
+.profile-modal {
+  max-width: 90vw;
+}

@@ -42,6 +42,7 @@ const ViewReserve = () => {
     // Add these new state variables with the other useState declarations
     const [notifications, setNotifications] = useState(0);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const user_level_id = localStorage.getItem('user_level_id');
 
     const statusColors = {
         confirmed: 'bg-green-100 text-green-800',
@@ -57,7 +58,7 @@ const ViewReserve = () => {
     const confirmCancelReservation = async () => {
         try {
             const formData = new URLSearchParams();
-            formData.append('reservation_id', reservationToCancel.id);
+            formData.append('approval_id', reservationToCancel.id);  // Changed from reservation_id to approval_id
             formData.append('operation', 'cancelReservation');
 
             const response = await fetch('http://localhost/coc/gsd/fetch_reserve.php', {
@@ -91,62 +92,16 @@ const ViewReserve = () => {
             setReservationToCancel(null);
         }
     };
+    useEffect(() => {
+        if (user_level_id !== '3' ) {
+            localStorage.clear();
+            navigate('/gsd');
+        }
+      }, [user_level_id, navigate]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setCurrentReservation({ ...currentReservation, [name]: value });
-    };
-
-    const handleEdit = async (reservation) => {
-        try {
-            const formData = new URLSearchParams();
-            formData.append('reservation_id', reservation.id);
-            formData.append('operation', 'getReservationDetailsById'); // Add operation parameter
-            
-            const response = await fetch(`http://localhost/coc/gsd/fetch_reserve.php`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: formData.toString()
-            });
-
-            // Check if response is valid JSON
-            const textResponse = await response.text();
-            let result;
-            try {
-                result = JSON.parse(textResponse);
-            } catch (error) {
-                console.error('Invalid JSON response:', textResponse);
-                throw new Error('Invalid server response');
-            }
-            
-            if (result.status === 'success') {
-                const { reservation: details, equipment, vehicles, venues } = result.data;
-                setCurrentReservation({
-                    id: details.reservation_id,
-                    name: details.reservation_name,
-                    eventTitle: details.reservation_event_title,
-                    description: details.reservation_description,
-                    startDate: details.reservation_start_date.split(' ')[0],
-                    startTime: details.reservation_start_date.split(' ')[1],
-                    endDate: details.reservation_end_date.split(' ')[0],
-                    endTime: details.reservation_end_date.split(' ')[1],
-                    status: details.status_master_name,
-                    userName: details.users_name,
-                    userContact: details.users_contact_number,
-                    equipment: equipment,
-                    vehicles: vehicles,
-                    venues: venues
-                });
-                setEditModalOpen(true);
-            } else {
-                throw new Error(result.message || 'Failed to fetch reservation details');
-            }
-        } catch (error) {
-            console.error('Error fetching reservation details:', error);
-            // Optionally add user notification here
-        }
     };
 
     const handleSubmit = (e) => {
@@ -171,47 +126,144 @@ const ViewReserve = () => {
 
     const fetchReservations = async () => {
         try {
-            const response = await fetch('http://localhost/coc/gsd/fetch_reserve.php', {
+            const userId = localStorage.getItem('user_id'); // Get user_id from localStorage
+            
+            // Create the request body
+            const requestBody = {
+                operation: 'getUserReservations',
+                userId: parseInt(userId)
+            };
+
+            const response = await fetch('http://localhost/coc/gsd/user1.php', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Type': 'application/json',
                 },
-                body: 'operation=fetchAllReservations'
+                body: JSON.stringify(requestBody)
             });
+
             const result = await response.json();
+            
             if (result.status === 'success') {
-                const transformedReservations = result.data.map(reservation => ({
-                    id: reservation.reservation_id,
-                    name: reservation.reservation_name,
-                    date: reservation.reservation_start_date.split(' ')[0],
-                    time: reservation.reservation_start_date.split(' ')[1],
-                    endDate: reservation.reservation_end_date.split(' ')[0],
-                    endTime: reservation.reservation_end_date.split(' ')[1],
-                    venue: reservation.venue_names || 'No venue specified',
-                    status: reservation.reservation_status_name.toLowerCase(),
-                    description: reservation.reservation_description,
-                    equipment: reservation.equipment_names,
-                    vehicles: reservation.vehicle_ids
+                const transformedReservations = result.data.map(approval => ({
+                    id: approval.approval_id,
+                    name: approval.venue_form_name || approval.vehicle_form_name || 'Unnamed Reservation',
+                    date: approval.approval_created_at.split(' ')[0],
+                    time: approval.approval_created_at.split(' ')[1],
+                    status: approval.approval_status.toLowerCase(),
+                    details: approval.venue_details || approval.vehicle_details || 'No details available',
+                    type: approval.approval_form_venue_id ? 'venue' : 'vehicle',
+                    reservationStatus: approval.reservation_status || approval.approval_status,
+                    // Add additional fields that might be useful
+                    formVenueId: approval.approval_form_venue_id,
+                    formVehicleId: approval.approval_form_vehicle_id,
+                    statusId: approval.approval_status_id,
+                    reservationStatusId: approval.reservation_status_status_reservation_id
                 }));
+                
+                console.log('Transformed reservations:', transformedReservations); // Debug log
                 setReservations(transformedReservations);
+            } else {
+                console.error('Failed to fetch reservations:', result.message);
+                toast.error('Failed to fetch reservations');
             }
         } catch (error) {
             console.error('Error fetching reservations:', error);
+            toast.error('Error fetching reservations');
         }
     };
 
+    // Make sure to call fetchReservations when the component mounts
     useEffect(() => {
         fetchReservations();
+        // Set up periodic refresh (optional)
+        const interval = setInterval(fetchReservations, 30000); // Refresh every 30 seconds
+        return () => clearInterval(interval);
     }, []);
 
     const filteredReservations = reservations.filter(reservation => 
         activeFilter === 'all' ? true : reservation.status === activeFilter
     );
 
-    const handleViewReservation = (reservation) => {
-        setSelectedReservation(reservation);
-        setShowViewModal(true);
+    const handleViewReservation = async (reservation) => {
+        console.log('View button clicked for reservation:', reservation);
+
+        try {
+            const requestBody = {
+                operation: "getUserReservationDetailsById",
+                approvalId: reservation.id
+            };
+            
+            console.log('Sending request with body:', requestBody);
+
+            const response = await fetch('http://localhost/coc/gsd/user1.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            const result = await response.json();
+            console.log('API Response:', result);
+
+            if (result.status === 'success' && result.data.length > 0) {
+                const details = result.data[0];
+                console.log('Raw details:', details);
+
+                // Transform the data to match the API response structure
+                const processedReservation = {
+                    id: details.approval_id,
+                    approvalCreatedAt: details.approval_created_at,
+                    department: details.departments_name,
+                    vehicleInfo: details.approval_form_vehicle_id ? {
+                        license: details.vehicle_license,
+                        model: details.vehicle_model,
+                        make: details.vehicle_make,
+                        category: details.vehicle_category,
+                        formName: details.vehicle_form_name,
+                        purpose: details.vehicle_form_purpose,
+                        destination: details.vehicle_form_destination,
+                        startDate: details.vehicle_form_start_date,
+                        endDate: details.vehicle_form_end_date,
+                        userFullName: details.vehicle_form_user_full_name,
+                        passengerNames: details.passenger_names?.split(',') || [],
+                        passengerIds: details.passenger_ids?.split(',') || []
+                    } : null,
+                    venueInfo: details.approval_form_venue_id ? {
+                        name: details.venue_name,
+                        formName: details.venue_form_name,
+                        eventTitle: details.venue_form_event_title,
+                        description: details.venue_form_description,
+                        participants: details.venue_participants,
+                        startDate: details.venue_form_start_date,
+                        endDate: details.venue_form_end_date,
+                        userFullName: details.venue_form_user_full_name
+                    } : null,
+                    equipmentInfo: details.equipment_name ? {
+                        name: details.equipment_name,
+                        quantity: details.reservation_equipment_quantity
+                    } : null,
+                    status: {
+                        approvalStatus: details.status_approval_name,
+                        requestStatus: details.status_request,
+                        currentReservationStatus: details.current_reservation_status
+                    }
+                };
+
+                console.log('Processed reservation data:', processedReservation);
+                setSelectedReservation(processedReservation);
+                setShowViewModal(true);
+            } else {
+                console.error('Failed to fetch details:', result);
+                toast.error('Failed to fetch reservation details');
+            }
+        } catch (error) {
+            console.error('Error in handleViewReservation:', error);
+            toast.error('Error fetching reservation details');
+        }
     };
+
     const handleNavigation = () => {
         navigate('/dashboard'); // Navigate to /dashboard on click
       };
@@ -381,7 +433,10 @@ const ViewReserve = () => {
                             >
                                 <div className="flex justify-between items-start">
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-semibold text-gray-800">{reservation.name}</h3>
+                                        <h3 className="text-xl font-semibold text-gray-800">
+                                            {reservation.name}
+                                            <span className="ml-2 text-sm text-gray-500 capitalize">({reservation.type})</span>
+                                        </h3>
                                         <div className="flex gap-4 text-gray-600">
                                             <span className="flex items-center gap-2">
                                                 <FaCalendar className="text-blue-500" />
@@ -389,20 +444,16 @@ const ViewReserve = () => {
                                             </span>
                                             <span className="flex items-center gap-2">
                                                 <FaClock className="text-blue-500" />
-                                                {reservation.time} - {reservation.endTime}
-                                            </span>
-                                            <span className="flex items-center gap-2">
-                                                <FaUser className="text-blue-500" />
-                                                {reservation.guests || 'N/A'} guests
+                                                {reservation.time}
                                             </span>
                                         </div>
-                                        {reservation.description && (
-                                            <p className="text-gray-500 text-sm">Description: {reservation.description}</p>
-                                        )}
+                                        <p className="text-gray-500 text-sm">
+                                            {reservation.details}
+                                        </p>
                                     </div>
                                     <div className="flex flex-col items-end gap-2">
                                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[reservation.status]}`}>
-                                            {reservation.status}
+                                            {reservation.reservationStatus}
                                         </span>
                                         <div className="flex items-center gap-2 mt-2">
                                             <button
@@ -413,22 +464,13 @@ const ViewReserve = () => {
                                                 <span className="text-sm">View</span>
                                             </button>
                                             {reservation.status !== 'cancelled' && (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleEdit(reservation)}
-                                                        className="flex items-center gap-1 px-3 py-1 text-green-600 hover:bg-green-50 rounded-full transition-all duration-300"
-                                                    >
-                                                        <FaEdit size={16} />
-                                                        <span className="text-sm">Edit</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleCancelReservation(reservation)}
-                                                        className="flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded-full transition-all duration-300"
-                                                    >
-                                                        <FaTrash size={16} />
-                                                        <span className="text-sm">Cancel Reservation</span>
-                                                    </button>
-                                                </>
+                                                <button
+                                                    onClick={() => handleCancelReservation(reservation)}
+                                                    className="flex items-center gap-1 px-3 py-1 text-red-600 hover:bg-red-50 rounded-full transition-all duration-300"
+                                                >
+                                                    <FaTrash size={16} />
+                                                    <span className="text-sm">Cancel Reservation</span>
+                                                </button>
                                             )}
                                         </div>
                                     </div>
@@ -444,52 +486,116 @@ const ViewReserve = () => {
                                 initial={{ scale: 0.8, opacity: 0 }}
                                 animate={{ scale: 1, opacity: 1 }}
                                 transition={{ duration: 0.3 }}
-                                className="bg-white rounded-2xl p-8 w-full max-w-2xl transform transition-all duration-300 ease-in-out"
+                                className="bg-white rounded-2xl p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
                             >
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-2xl font-bold text-gray-800">Reservation Details</h2>
-                                    <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">
-                                        &times;
-                                    </button>
+                                    <button onClick={() => setShowViewModal(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
                                 </div>
-                                <div className="space-y-4">
+
+                                <div className="space-y-6">
+                                    {/* Basic Info */}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Reservation Name</h3>
-                                            <p className="mt-1 text-lg">{selectedReservation.name}</p>
+                                            <h3 className="text-sm font-medium text-gray-500">Department</h3>
+                                            <p className="mt-1">{selectedReservation.department}</p>
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Status</h3>
-                                            <span className={`inline-block mt-1 px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedReservation.status]}`}>
-                                                {selectedReservation.status}
-                                            </span>
+                                            <h3 className="text-sm font-medium text-gray-500">GSD Action Status:</h3>
+                                            <p className="mt-1">{selectedReservation.status.currentReservationStatus}</p>
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Date</h3>
-                                            <p className="mt-1">{format(new Date(selectedReservation.date), 'MMM dd, yyyy')}</p>
+                                            <h3 className="text-sm font-medium text-gray-500">Dean Secretary Action Status:</h3>
+                                            <p className="mt-1">{selectedReservation.status.approvalStatus}</p>
                                         </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Time</h3>
-                                            <p className="mt-1">{selectedReservation.time} - {selectedReservation.endTime}</p>
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Venue</h3>
-                                            <p className="mt-1">{selectedReservation.venue}</p>
-                                        </div>
-                                        {selectedReservation.equipment && (
-                                            <div>
-                                                <h3 className="text-sm font-medium text-gray-500">Equipment</h3>
-                                                <p className="mt-1">{selectedReservation.equipment}</p>
-                                            </div>
-                                        )}
                                     </div>
-                                    {selectedReservation.description && (
-                                        <div>
-                                            <h3 className="text-sm font-medium text-gray-500">Description</h3>
-                                            <p className="mt-1 text-gray-700">{selectedReservation.description}</p>
+
+                                    {/* Venue Information - Updated Section */}
+                                    {selectedReservation.venueInfo && (
+                                        <div className="border-t pt-4">
+                                            <h3 className="text-lg font-semibold mb-3">Venue Details</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Venue Name</h4>
+                                                    <p className="mt-1">{selectedReservation.venueInfo.name}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Event Title</h4>
+                                                    <p className="mt-1">{selectedReservation.venueInfo.eventTitle}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Description</h4>
+                                                    <p className="mt-1">{selectedReservation.venueInfo.description}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Number of Participants</h4>
+                                                    <p className="mt-1">{selectedReservation.venueInfo.participants}</p>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <h4 className="text-sm font-medium text-gray-500">Duration</h4>
+                                                    <p className="mt-1">
+                                                        From: {format(new Date(selectedReservation.venueInfo.startDate), 'MMM dd, yyyy HH:mm')}
+                                                        <br />
+                                                        To: {format(new Date(selectedReservation.venueInfo.endDate), 'MMM dd, yyyy HH:mm')}
+                                                    </p>
+                                                </div>
+                                                {selectedReservation.equipmentInfo && (
+                                                    <div className="col-span-2">
+                                                        <h4 className="text-sm font-medium text-gray-500">Equipment</h4>
+                                                        <p className="mt-1">
+                                                            {selectedReservation.equipmentInfo.name} 
+                                                            (Quantity: {selectedReservation.equipmentInfo.quantity})
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Keep existing vehicle and equipment sections */}
+                                    {selectedReservation.vehicleInfo && (
+                                        <div className="border-t pt-4">
+                                            <h3 className="text-lg font-semibold mb-3">Vehicle Details</h3>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Vehicle Info</h4>
+                                                    <p className="mt-1">{`${selectedReservation.vehicleInfo.make} ${selectedReservation.vehicleInfo.model} (${selectedReservation.vehicleInfo.license})`}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Purpose</h4>
+                                                    <p className="mt-1">{selectedReservation.vehicleInfo.purpose}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Destination</h4>
+                                                    <p className="mt-1">{selectedReservation.vehicleInfo.destination}</p>
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-medium text-gray-500">Duration</h4>
+                                                    <p className="mt-1">{`${format(new Date(selectedReservation.vehicleInfo.startDate), 'MMM dd, yyyy HH:mm')} - ${format(new Date(selectedReservation.vehicleInfo.endDate), 'MMM dd, yyyy HH:mm')}`}</p>
+                                                </div>
+                                            </div>
+                                            {selectedReservation.vehicleInfo.passengerNames.length > 0 && (
+                                                <div className="mt-3">
+                                                    <h4 className="text-sm font-medium text-gray-500">Passengers</h4>
+                                                    <ul className="mt-1 list-disc list-inside">
+                                                        {selectedReservation.vehicleInfo.passengerNames.map((name, index) => (
+                                                            <li key={index}>{name}</li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Equipment Information */}
+                                    {selectedReservation.equipmentInfo && (
+                                        <div className="border-t pt-4">
+                                            <h3 className="text-lg font-semibold mb-3">Equipment Details</h3>
+                                            <p>{`${selectedReservation.equipmentInfo.name} (Qty: ${selectedReservation.equipmentInfo.quantity})`}</p>
                                         </div>
                                     )}
                                 </div>
+
                                 <div className="mt-8 flex justify-end">
                                     <button
                                         onClick={() => setShowViewModal(false)}
@@ -532,137 +638,6 @@ const ViewReserve = () => {
                                         Yes, Cancel Reservation
                                     </button>
                                 </div>
-                            </motion.div>
-                        </div>
-                    )}
-
-                    {/* Edit Reservation Modal */}
-                    {editModalOpen && currentReservation && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-                            <motion.div 
-                                initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                transition={{ duration: 0.3 }}
-                                className="bg-white rounded-2xl p-8 w-full max-w-4xl transform transition-all duration-300 ease-in-out"
-                            >
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-2xl font-bold text-gray-800">
-                                        Edit Reservation
-                                    </h2>
-                                    <button onClick={() => setEditModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                        &times;
-                                    </button>
-                                </div>
-                                <form onSubmit={handleSubmit} className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-6">
-                                        {/* Basic Information */}
-                                        <div className="space-y-4">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">Event Title</label>
-                                                <input
-                                                    type="text"
-                                                    name="eventTitle"
-                                                    value={currentReservation.eventTitle}
-                                                    onChange={handleChange}
-                                                    className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700">Description</label>
-                                                <textarea
-                                                    name="description"
-                                                    value={currentReservation.description}
-                                                    onChange={handleChange}
-                                                    rows={3}
-                                                    className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Date and Time */}
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                                                    <input
-                                                        type="date"
-                                                        name="startDate"
-                                                        value={currentReservation.startDate}
-                                                        onChange={handleChange}
-                                                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">Start Time</label>
-                                                    <input
-                                                        type="time"
-                                                        name="startTime"
-                                                        value={currentReservation.startTime}
-                                                        onChange={handleChange}
-                                                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">End Date</label>
-                                                    <input
-                                                        type="date"
-                                                        name="endDate"
-                                                        value={currentReservation.endDate}
-                                                        onChange={handleChange}
-                                                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">End Time</label>
-                                                    <input
-                                                        type="time"
-                                                        name="endTime"
-                                                        value={currentReservation.endTime}
-                                                        onChange={handleChange}
-                                                        className="mt-1 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Display read-only information */}
-                                    <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-                                        <h3 className="font-medium text-gray-900 mb-4">Additional Information</h3>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <p className="text-sm text-gray-500">Venues</p>
-                                                <p className="text-gray-700">{currentReservation.venues?.map(v => v.ven_name).join(', ') || 'None'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Equipment</p>
-                                                <p className="text-gray-700">{currentReservation.equipment?.map(e => `${e.equip_name} (${e.quantity})`).join(', ') || 'None'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-sm text-gray-500">Vehicles</p>
-                                                <p className="text-gray-700">{currentReservation.vehicles?.map(v => v.vehicle_license).join(', ') || 'None'}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end gap-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setEditModalOpen(false)}
-                                            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            type="submit"
-                                            className="px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700"
-                                        >
-                                            Save Changes
-                                        </button>
-                                    </div>
-                                </form>
                             </motion.div>
                         </div>
                     )}

@@ -3,6 +3,7 @@ import axios from 'axios';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Sidebar from './Sidebar';
+import { motion, AnimatePresence } from 'framer-motion'; // Add this import
 import {
   Table,
   Badge,
@@ -24,7 +25,8 @@ import {
   Tag,
   Spin
 } from 'antd';
-import { EyeOutlined, UserOutlined, ClockCircleOutlined, TeamOutlined, CarOutlined, ToolOutlined } from '@ant-design/icons';
+import { EyeOutlined, UserOutlined, ClockCircleOutlined, TeamOutlined, CarOutlined, ToolOutlined, CheckCircleOutlined,
+  CloseCircleOutlined } from '@ant-design/icons';
 import moment from 'moment';
 
 const { Search } = Input;
@@ -66,7 +68,7 @@ const getStatusColor = (status) => {
     case 'decline':
     case 'declined':
       return 'red';
-    case 'reserved':
+    case 'Reserved':
       return 'blue';
     case 'cancelled':
       return 'gray';
@@ -241,41 +243,80 @@ const DetailModal = ({ visible, record, onClose, theme }) => {
     }
   ];
 
-  return (
-    <Modal
-      title={
-        <span style={{ color: theme.primary }}>
-          Reservation Details - {record?.reservation_event_title}
-        </span>
+  // Add animation variants
+  const modalVariants = {
+    hidden: { opacity: 0, scale: 0.8 },
+    visible: { 
+      opacity: 1, 
+      scale: 1,
+      transition: {
+        duration: 0.3,
+        ease: "easeOut"
       }
-      open={visible}
-      onCancel={onClose}
-      width={800}
-      footer={[
-        <Button 
-          key="close-button"
-          onClick={onClose}
-          style={{
-            backgroundColor: theme.primary,
-            color: theme.white
-          }}
+    },
+    exit: {
+      opacity: 0,
+      scale: 0.8,
+      transition: {
+        duration: 0.2
+      }
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div 
+          className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
         >
-          Close
-        </Button>
-      ]}
-      style={{
-        borderRadius: '12px',
-        overflow: 'hidden'
-      }}
-      className="detail-modal"
-    >
-      <Tabs 
-        defaultActiveKey="1" 
-        items={items}
-        onChange={setActiveTab}
-        className="detail-tabs"
-      />
-    </Modal>
+          <motion.div 
+            className="bg-white rounded-xl p-8 max-w-2xl w-full mx-4"
+            variants={modalVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+          >
+            <Modal
+              title={
+                <span style={{ color: theme.primary }}>
+                  Reservation Details - {record?.reservation_event_title}
+                </span>
+              }
+              open={visible}
+              onCancel={onClose}
+              width={800}
+              footer={[
+                <Button 
+                  key="close-button"
+                  onClick={onClose}
+                  style={{
+                    backgroundColor: theme.primary,
+                    color: theme.white
+                  }}
+                >
+                  Close
+                </Button>
+              ]}
+              style={{
+                borderRadius: '12px',
+                overflow: 'hidden'
+              }}
+              className="detail-modal"
+            >
+              <Tabs 
+                defaultActiveKey="1" 
+                items={items}
+                onChange={setActiveTab}
+                className="detail-tabs"
+              />
+            </Modal>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -409,37 +450,55 @@ const Record = () => {
     setIsModalVisible(true);
   };
 
+  // Add animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: { 
+        duration: 0.5,
+        when: "beforeChildren",
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0,
+      opacity: 1,
+      transition: {
+        duration: 0.5
+      }
+    }
+  };
+
   return (
-    <div style={{ display: 'flex' }}>
+    <div className="flex min-h-screen bg-gray-100">
       <Sidebar />
-      <div className="p-4" style={{ 
-        backgroundColor: themeColors.light, 
-        minHeight: '100vh',
-        width: '100%' 
-      }}>
-        <Card 
-          className="m-4"
-          style={{ 
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            borderRadius: '12px',
-            border: 'none'
-          }}
+      <motion.div 
+        className="flex-1 p-4 lg:p-8"
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <motion.div 
+          className="bg-white rounded-lg shadow-lg p-6"
+          variants={itemVariants}
         >
-          <ToastContainer />
-          <div className="mb-4">
-            <Title level={2} style={{ color: themeColors.primary }}>Reservation Records</Title>
-            <Space className="mb-4" size="large">
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold text-green-800 mb-4">Reservation Records</h1>
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
               <Search
                 placeholder="Search reservations..."
                 allowClear
                 onChange={(e) => setSearchText(e.target.value)}
-                style={{ width: 300 }}
-                className="search-input"
+                className="w-full md:w-80"
               />
               <Select
                 defaultValue="all"
-                style={{ width: 120 }}
-                className="status-select"
+                className="w-full md:w-40"
                 onChange={setStatusFilter}
                 options={[
                   { value: 'all', label: 'All Status' },
@@ -448,37 +507,42 @@ const Record = () => {
                   { value: '3', label: 'Declined' }
                 ]}
               />
-            </Space>
+            </div>
           </div>
-    
-          <Table
-            columns={columns}
-            dataSource={filteredReservations}
-            rowKey="approval_id"
-            loading={loading}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total) => `Total ${total} reservations`,
-            }}
-            scroll={{ x: 1000 }}
-            style={{
-              borderRadius: '8px',
-              overflow: 'hidden'
-            }}
-            className="record-table"
-          />
-          <DetailModal
-            visible={isModalVisible}
-            record={selectedRecord}
-            onClose={() => {
-              setIsModalVisible(false);
-              setSelectedRecord(null);
-            }}
-            theme={themeColors}
-          />
-        </Card>
-      </div>
+
+          <motion.div 
+            className="overflow-x-auto"
+            variants={itemVariants}
+          >
+            <Table
+              columns={columns}
+              dataSource={filteredReservations}
+              rowKey="approval_id"
+              loading={loading}
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total) => `Total ${total} reservations`,
+                responsive: true
+              }}
+              scroll={{ x: true }}
+              className="w-full"
+            />
+          </motion.div>
+
+          
+        </motion.div>
+
+        <DetailModal
+          visible={isModalVisible}
+          record={selectedRecord}
+          onClose={() => {
+            setIsModalVisible(false);
+            setSelectedRecord(null);
+          }}
+          theme={themeColors}
+        />
+      </motion.div>
     </div>
   );
 };

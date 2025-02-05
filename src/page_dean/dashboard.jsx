@@ -399,9 +399,10 @@ const Dashboard = () => {
                 whileHover="hover"
                 whileTap="tap"
                 onClick={() => {
-                  localStorage.clear();
                   sessionStorage.clear();
-                  navigate('/');
+                  localStorage.clear();
+                  navigate('/gsd');
+                  window.location.reload();
                 }}
                 className="flex items-center space-x-2 text-red-600 px-4 py-2 rounded-lg text-sm font-medium"
               >

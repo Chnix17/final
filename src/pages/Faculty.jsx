@@ -76,15 +76,34 @@ const Faculty = () => {
         setLoading(true);
         try {
             const response = await axios.post("http://localhost/coc/gsd/user.php", 
-                new URLSearchParams({ operation: "fetchUsers" }),
-                { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+                { operation: "fetchAllUser" },  // Changed to use JSON
+                { 
+                    headers: { 'Content-Type': 'application/json' }
+                }
             );
+
             if (response.data.status === 'success') {
-                setUsers(response.data.data);
+                // Transform the data to ensure all user types are included
+                const allUsers = response.data.data.map(user => ({
+                    users_id: user.id,
+                    users_fname: user.fname,
+                    users_mname: user.mname,
+                    users_lname: user.lname,
+                    users_email: user.email,
+                    users_school_id: user.school_id,
+                    users_contact_number: user.contact_number,
+                    users_pic: user.pic,
+                    departments_name: user.departments_name,
+                    user_level_name: user.user_level_name,
+                    users_user_level_id: user.user_level_desc,
+                    user_type: user.type
+                }));
+                setUsers(allUsers);
             } else {
                 toast.error("Error fetching users: " + response.data.message);
             }
         } catch (error) {
+            console.error('Error fetching users:', error);
             toast.error("An error occurred while fetching users.");
         } finally {
             setLoading(false);
@@ -149,7 +168,40 @@ const Faculty = () => {
 
     const getUserDetails = async (userId) => {
         try {
-            const response = await axios({
+            // First try to fetch as admin
+            const adminResponse = await axios({
+                method: 'post',
+                url: 'http://localhost/coc/gsd/fetchMaster.php',
+                data: new URLSearchParams({
+                    operation: 'fetchAdminById',
+                    id: userId
+                }).toString(),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            if (adminResponse.data.status === 'success' && adminResponse.data.data.length > 0) {
+                const adminData = adminResponse.data.data[0];
+                return {
+                    users_id: adminData.admin_id,
+                    users_fname: adminData.admin_fname,
+                    users_mname: adminData.admin_mname,
+                    users_lname: adminData.admin_lname,
+                    users_email: adminData.admin_email,
+                    users_school_id: adminData.admin_school_id,
+                    users_contact_number: adminData.admin_contact_number,
+                    users_pic: adminData.admin_pic,
+                    departments_name: adminData.departments_name,
+                    user_level_name: adminData.user_level_name,
+                    users_user_level_id: adminData.admin_user_level_id,
+                    users_department_id: adminData.admin_department_id,
+                    is_admin: true
+                };
+            }
+
+            // If not found as admin, try as regular user
+            const userResponse = await axios({
                 method: 'post',
                 url: 'http://localhost/coc/gsd/fetchMaster.php',
                 data: new URLSearchParams({
@@ -161,11 +213,43 @@ const Faculty = () => {
                 }
             });
 
-            if (response.data.status === 'success') {
-                return response.data.data[0];
-            } else {
-                throw new Error('Failed to fetch user details');
+            if (userResponse.data.status === 'success' && userResponse.data.data.length > 0) {
+                return userResponse.data.data[0];
             }
+
+            // If not found as regular user, try as dean/secretary
+            const deanSecResponse = await axios({
+                method: 'post',
+                url: 'http://localhost/coc/gsd/fetchMaster.php',
+                data: new URLSearchParams({
+                    operation: 'fetchDeanSecById',
+                    id: userId
+                }).toString(),
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            if (deanSecResponse.data.status === 'success' && deanSecResponse.data.data.length > 0) {
+                const deanData = deanSecResponse.data.data[0];
+                return {
+                    users_id: deanData.dept_id,
+                    users_fname: deanData.dept_fname,
+                    users_mname: deanData.dept_mname,
+                    users_lname: deanData.dept_lname,
+                    users_email: deanData.dept_email,
+                    users_school_id: deanData.dept_school_id,
+                    users_contact_number: deanData.dept_contact_number,
+                    users_pic: deanData.dept_pic,
+                    departments_name: deanData.departments_name,
+                    user_level_name: deanData.user_level_name,
+                    users_user_level_id: deanData.dept_user_level_id,
+                    users_department_id: deanData.dept_department_id,
+                    is_dean_sec: true
+                };
+            }
+
+            throw new Error('User not found');
         } catch (error) {
             console.error('Error fetching user details:', error);
             toast.error("Failed to fetch user details");
@@ -313,9 +397,12 @@ const Faculty = () => {
     const userLevelTemplate = (rowData) => {
         const levelConfig = {
             'Admin': { color: 'bg-purple-500', icon: 'pi pi-star' },
-            'Faculty': { color: 'bg-blue-500', icon: 'pi pi-users' },
-            'Staff': { color: 'bg-green-500', icon: 'pi pi-user' }
+            'Dean': { color: 'bg-orange-500', icon: 'pi pi-briefcase' },
+            'Secretary': { color: 'bg-pink-500', icon: 'pi pi-inbox' },
+            'Personnel': { color: 'bg-blue-500', icon: 'pi pi-user' },
+            'user': { color: 'bg-green-500', icon: 'pi pi-users' }
         };
+        
         const config = levelConfig[rowData.user_level_name] || { color: 'bg-gray-500', icon: 'pi pi-user' };
         
         return (
@@ -526,25 +613,111 @@ const FacultyModal = ({
     // Add imageUrl state
     const [imageUrl, setImageUrl] = useState('');
 
+    // Add these new state variables
+    const [passwordValidation, setPasswordValidation] = useState({
+        hasUpperCase: false,
+        hasLowerCase: false,
+        hasNumber: false,
+        hasSpecialChar: false,
+        hasMinLength: false
+    });
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [passwordsMatch, setPasswordsMatch] = useState(true);
+
+    // Add password validation function
+    const validatePassword = (password) => {
+        setPasswordValidation({
+            hasUpperCase: /[A-Z]/.test(password),
+            hasLowerCase: /[a-z]/.test(password),
+            hasNumber: /[0-9]/.test(password),
+            hasSpecialChar: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+            hasMinLength: password.length >= 8
+        });
+    };
+
+    // Add new state for validation
+    const [validation, setValidation] = useState({
+        email: { isValid: true, message: '' },
+        schoolId: { isValid: true, message: '' }
+    });
+
+    // Add debounce function
+    const debounce = (func, wait) => {
+        let timeout;
+        return (...args) => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func(...args), wait);
+        };
+    };
+
+    // Add check duplicates function
+    const checkDuplicates = async (field, value) => {
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/user.php', {
+                operation: 'checkUniqueEmailAndSchoolId',
+                email: field === 'email' ? value : formData.users_email,
+                schoolId: field === 'schoolId' ? value : formData.users_school_id
+            });
+
+            if (response.data.status === 'success' && response.data.exists) {
+                const duplicates = response.data.duplicates;
+                duplicates.forEach(duplicate => {
+                    if (duplicate.field === 'email' && field === 'email') {
+                        setValidation(prev => ({
+                            ...prev,
+                            email: {
+                                isValid: false,
+                                message: `This email is already registered as a ${duplicate.type}`
+                            }
+                        }));
+                    }
+                    if (duplicate.field === 'school_id' && field === 'schoolId') {
+                        setValidation(prev => ({
+                            ...prev,
+                            schoolId: {
+                                isValid: false,
+                                message: `This School ID is already registered as a ${duplicate.type}`
+                            }
+                        }));
+                    }
+                });
+            } else {
+                setValidation(prev => ({
+                    ...prev,
+                    [field === 'email' ? 'email' : 'schoolId']: {
+                        isValid: true,
+                        message: ''
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error('Validation error:', error);
+        }
+    };
+
+    // Create debounced version of check duplicates
+    const debouncedCheckDuplicates = debounce(checkDuplicates, 500);
+
     useEffect(() => {
         const fetchUserData = async () => {
             if (user && type === 'edit') {
                 const userDetails = await getUserDetails(user.users_id);
                 if (userDetails) {
                     setFormData({
-                        users_id: userDetails.users_id || '',
-                        users_firstname: userDetails.users_fname || '',
-                        users_middlename: userDetails.users_mname || '',
-                        users_lastname: userDetails.users_lname || '',
-                        users_school_id: userDetails.users_school_id || '',
-                        users_contact_number: userDetails.users_contact_number || '',
-                        users_email: userDetails.users_email || '',
-                        departments_name: userDetails.departments_name || '',
+                        users_id: userDetails.users_id,
+                        users_firstname: userDetails.users_fname || userDetails.dept_fname,
+                        users_middlename: userDetails.users_mname || userDetails.dept_mname,
+                        users_lastname: userDetails.users_lname || userDetails.dept_lname,
+                        users_school_id: userDetails.users_school_id || userDetails.dept_school_id,
+                        users_contact_number: userDetails.users_contact_number || userDetails.dept_contact_number,
+                        users_email: userDetails.users_email || userDetails.dept_email,
+                        departments_name: userDetails.departments_name,
                         users_password: '',
-                        users_role: userDetails.users_user_level_id || '',
+                        users_role: userDetails.users_user_level_id || userDetails.dept_user_level_id,
+                        users_department_id: userDetails.users_department_id || userDetails.dept_department_id,
+                        is_dean_sec: userDetails.is_dean_sec || false
                     });
-                    // Set the image URL
-                    setImageUrl(`http://localhost/coc/gsd/${userDetails.users_pic || 'uploads/profileni.png'}`);
+                    setImageUrl(`http://localhost/coc/gsd/${userDetails.users_pic || userDetails.dept_pic || 'uploads/profileni.png'}`);
                 }
             } else {
                 // Reset form for new user
@@ -567,14 +740,53 @@ const FacultyModal = ({
         fetchUserData();
     }, [user, type, getUserDetails]);
 
+    // Modify handleChange to include validation
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData({ ...formData, [name]: value });
+        setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Validate password if it's changing
+        if (name === 'users_password') {
+            validatePassword(value);
+            setPasswordsMatch(value === confirmPassword);
+        }
+        if (name === 'confirm_password') {
+            setConfirmPassword(value);
+            setPasswordsMatch(formData.users_password === value);
+        }
+
+        // Check for duplicates
+        if (name === 'users_email') {
+            debouncedCheckDuplicates('email', value);
+        }
+        if (name === 'users_school_id') {
+            debouncedCheckDuplicates('schoolId', value);
+        }
     };
 
+    // Modify handleSubmit to include validation check
     const handleSubmit = async (e) => {
         e.preventDefault();
-       
+
+        // Check for validation errors
+        if (!validation.email.isValid || !validation.schoolId.isValid) {
+            toast.error("Please fix validation errors before submitting");
+            return;
+        }
+
+        // Check if all password requirements are met when adding new user
+        if (type === 'add') {
+            const isPasswordValid = Object.values(passwordValidation).every(Boolean);
+            if (!isPasswordValid) {
+                toast.error("Password does not meet requirements");
+                return;
+            }
+            if (!passwordsMatch) {
+                toast.error("Passwords do not match");
+                return;
+            }
+        }
+
         const selectedDepartment = departments.find(
             dept => dept.departments_name === formData.departments_name
         );
@@ -694,7 +906,19 @@ const FacultyModal = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Form.Group>
                                 <Form.Label>School ID</Form.Label>
-                                <Form.Control type="text" name="users_school_id" value={formData.users_school_id} onChange={handleChange} required />
+                                <Form.Control 
+                                    type="text" 
+                                    name="users_school_id" 
+                                    value={formData.users_school_id} 
+                                    onChange={handleChange} 
+                                    required
+                                    className={!validation.schoolId.isValid ? 'border-red-500' : ''}
+                                />
+                                {!validation.schoolId.isValid && (
+                                    <div className="text-red-500 text-sm mt-1">
+                                        {validation.schoolId.message}
+                                    </div>
+                                )}
                             </Form.Group>
                             <Form.Group>
                                 <Form.Label>Phone Number</Form.Label>
@@ -705,7 +929,19 @@ const FacultyModal = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                             <Form.Group>
                                 <Form.Label>Email Address</Form.Label>
-                                <Form.Control type="email" name="users_email" value={formData.users_email} onChange={handleChange} required />
+                                <Form.Control 
+                                    type="email" 
+                                    name="users_email" 
+                                    value={formData.users_email} 
+                                    onChange={handleChange} 
+                                    required
+                                    className={!validation.email.isValid ? 'border-red-500' : ''}
+                                />
+                                {!validation.email.isValid && (
+                                    <div className="text-red-500 text-sm mt-1">
+                                        {validation.email.message}
+                                    </div>
+                                )}
                             </Form.Group>
                             <Form.Group>
                                 <Form.Label>Role</Form.Label>
@@ -734,8 +970,52 @@ const FacultyModal = ({
                             </Form.Group>
                             <Form.Group>
                                 <Form.Label>{type === 'edit' ? 'New Password (leave blank to keep current)' : 'Password'}</Form.Label>
-                                <Form.Control type="password" name="users_password" value={formData.users_password} onChange={handleChange} required={type === 'add'} />
+                                <Form.Control 
+                                    type="password" 
+                                    name="users_password" 
+                                    value={formData.users_password} 
+                                    onChange={handleChange} 
+                                    required={type === 'add'}
+                                    className={type === 'add' && !Object.values(passwordValidation).every(Boolean) ? 'border-red-500' : ''}
+                                />
+                                {type === 'add' && (
+                                    <div className="mt-2 text-sm">
+                                        <p className={passwordValidation.hasUpperCase ? 'text-green-600' : 'text-red-600'}>
+                                            ✓ One uppercase letter
+                                        </p>
+                                        <p className={passwordValidation.hasLowerCase ? 'text-green-600' : 'text-red-600'}>
+                                            ✓ One lowercase letter
+                                        </p>
+                                        <p className={passwordValidation.hasNumber ? 'text-green-600' : 'text-red-600'}>
+                                            ✓ One number
+                                        </p>
+                                        <p className={passwordValidation.hasSpecialChar ? 'text-green-600' : 'text-red-600'}>
+                                            ✓ One special character
+                                        </p>
+                                        <p className={passwordValidation.hasMinLength ? 'text-green-600' : 'text-red-600'}>
+                                            ✓ Minimum 8 characters
+                                        </p>
+                                    </div>
+                                )}
                             </Form.Group>
+                            {type === 'add' && (
+                                <Form.Group>
+                                    <Form.Label>Confirm Password</Form.Label>
+                                    <Form.Control 
+                                        type="password" 
+                                        name="confirm_password" 
+                                        value={confirmPassword} 
+                                        onChange={handleChange} 
+                                        required
+                                        className={!passwordsMatch ? 'border-red-500' : ''}
+                                    />
+                                    {!passwordsMatch && (
+                                        <p className="text-red-600 text-sm mt-1">
+                                            Passwords do not match
+                                        </p>
+                                    )}
+                                </Form.Group>
+                            )}
                         </div>
                     </Form>
                 )}

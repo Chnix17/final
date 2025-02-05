@@ -389,8 +389,6 @@ const ReservationRequests = () => {
                                                 </p>
                                             </div>
                                         </div>
-                                        
-                                        {/* Passengers */}
                                         {reservationDetails.passengers && (
                                             <div className="bg-gray-50 p-4 rounded-lg">
                                                 <p className="text-sm text-gray-500 mb-2">Passengers</p>
@@ -405,8 +403,6 @@ const ReservationRequests = () => {
                                         )}
                                     </div>
                                 )}
-
-                                {/* Venue Details */}
                                 {reservationDetails.venue?.venue_form_name && (
                                     <div className="space-y-4">
                                         <h4 className="font-semibold flex items-center">
@@ -465,12 +461,10 @@ const ReservationRequests = () => {
 <div className="flex justify-end gap-3 mt-6">
     <DialogClose asChild>
         <button className="px-4 py-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
-            Close
         </button>
     </DialogClose>
 
     {reservationDetails?.status_approval_name === 'declined' ? (
-        // Show only decline button if status is declined
         <button
             onClick={() => setIsDeclineModalOpen(true)}
             className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
@@ -478,7 +472,6 @@ const ReservationRequests = () => {
             Decline
         </button>
     ) : (
-        // Show both buttons for other statuses
         <>
             <button
                 onClick={handleAccept}

@@ -12,6 +12,8 @@ const Dashboard = () => {
   const [notificationsLoading, setNotificationsLoading] = useState(true);
   const [userName, setUserName] = useState('');
   const [showSupportTicket, setShowSupportTicket] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [fadeIn, setFadeIn] = useState(false);
 
   const navButtonVariants = {
     hover: { 
@@ -104,6 +106,29 @@ const Dashboard = () => {
     const storedName = localStorage.getItem('name');
     setUserName(storedName || 'User');
   }, []);
+
+  useEffect(() => {
+    const hasLoadedBefore = localStorage.getItem('hasLoadedDashboard');
+    const user_level_id = localStorage.getItem('user_level_id');
+
+    if (user_level_id !== '3' ) {
+      localStorage.clear();
+      navigate('/');
+    } else {
+      if (!hasLoadedBefore) {
+        const timeoutId = setTimeout(() => {
+          setLoading(false);
+          setFadeIn(true);
+          localStorage.setItem('hasLoadedDashboard', 'true');
+        }, 2000);
+
+        return () => clearTimeout(timeoutId);
+      } else {
+        setLoading(false);
+        setFadeIn(true);
+      }
+    }
+  }, [navigate]);
 
   const getNotificationIcon = (type) => {
     switch (type?.toLowerCase()) {
@@ -299,221 +324,207 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-white relative">
-      {/* Header Navigation */} 
-      <motion.header 
-        initial={{ y: -100 }}
-        animate={{ y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white backdrop-blur-sm bg-opacity-80 shadow-lg sticky top-0 z-50"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            {/* Left side - Logo and GSD Reservation title */}
-            <div className="flex items-center space-x-4">
-              <motion.img 
-                src="/images/assets/phinma.png"
-                alt="PHINMA CDO Logo"
-                className="w-12 h-12 object-cover rounded-full shadow-md"
-                whileHover={{ scale: 1.1, rotate: 360 }}
-                transition={{ duration: 0.5 }}
-              />
-              <motion.h1 
-                className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent"
-                whileHover={{ scale: 1.05 }}
-                transition={{ duration: 0.2 }}
-              >
-                GSD Reservation
-              </motion.h1>
-            </div>
-
-            {/* Right side navigation */}
-            <nav className="flex items-center space-x-6">
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                onClick={() => navigate('/addReservation')}
-              >
-                <FiCalendar className="w-5 h-5" />
-                <span>Make Reserve</span>
-              </motion.button>
-
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all"
-                onClick={() => setIsCalendarOpen(true)}
-              >
-                <FiCalendar className="w-5 h-5" />
-                <span>Calendar</span>
-              </motion.button>
-
-              <motion.button 
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
-                onClick={() => navigate('/viewReserve')}
-              >
-                <FiList className="w-5 h-5" />
-                <span>View Reserve</span>
-              </motion.button>
-
-              <div className="relative">
-                <motion.button 
-                  variants={navButtonVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                  className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
-                  onClick={() => setShowSupportTicket(!showSupportTicket)}
-                >
-                  <FiHelpCircle className="w-5 h-5" />
-                  <span>Support</span>
-                </motion.button>
-                <AnimatePresence>
-                  {showSupportTicket && <SupportTicketPopup />}
-                </AnimatePresence>
-              </div>
-
-              {/* Notification Bell */}
-              <NotificationBell />
-
-              {/* Settings */}
-             
-
-              {/* Profile */}
-              <motion.button 
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="p-2 text-gray-700 hover:text-green-600 transition-colors"
-                onClick={() => navigate('/profile')}
-              >
-                <FiUser className="w-6 h-6" />
-              </motion.button>
-
-              {/* Logout */}
-              <motion.button
-                variants={navButtonVariants}
-                whileHover="hover"
-                whileTap="tap"
-                onClick={() => {
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  navigate('/');
-                }}
-                className="flex items-center space-x-2 text-red-600 px-4 py-2 rounded-lg text-sm font-medium"
-              >
-                <FiLogOut className="w-5 h-5" />
-                <span>Logout</span>
-              </motion.button>
-            </nav>
-          </div>
+      {loading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
         </div>
-      </motion.header>
-
-      {/* Enhanced Main Content Area */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+      ) : (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: fadeIn ? 1 : 0 }}
           transition={{ duration: 0.5 }}
-          className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm bg-opacity-80 mb-8"
         >
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            Welcome back, {userName}! 👋
-          </h2>
-          <p className="text-gray-600 text-lg">
-            Here's what's happening with your reservations today.
-          </p>
-        </motion.div>
-
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {statsData.map((stat, index) => (
-            <motion.div
-              key={index}
+          <motion.header 
+            initial={{ y: -100 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white backdrop-blur-sm bg-opacity-80 shadow-lg sticky top-0 z-50"
+          >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-20">
+                <div className="flex items-center space-x-4">
+                  <motion.img 
+                    src="/images/assets/phinma.png"
+                    alt="PHINMA CDO Logo"
+                    className="w-12 h-12 object-cover rounded-full shadow-md"
+                    whileHover={{ scale: 1.1, rotate: 360 }}
+                    transition={{ duration: 0.5 }}
+                  />
+                  <motion.h1 
+                    className="text-2xl font-bold bg-gradient-to-r from-green-600 to-green-400 bg-clip-text text-transparent"
+                    whileHover={{ scale: 1.05 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    GSD Reservation
+                  </motion.h1>
+                </div>
+                <nav className="flex items-center space-x-6">
+                  <motion.button 
+                    variants={navButtonVariants}
+                    whileHover="hover"
+                    whileTap="tap"
+                    className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                    onClick={() => navigate('/addReservation')}
+                  >
+                    <FiCalendar className="w-5 h-5" />
+                    <span>Make Reserve</span>
+                  </motion.button>
+                  <motion.button 
+                    variants={navButtonVariants}
+                    whileHover="hover"
+                    whileTap="tap"
+                    className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                    onClick={() => setIsCalendarOpen(true)}
+                  >
+                    <FiCalendar className="w-5 h-5" />
+                    <span>Calendar</span>
+                  </motion.button>
+                  <motion.button 
+                    variants={navButtonVariants}
+                    whileHover="hover"
+                    whileTap="tap"
+                    className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                    onClick={() => navigate('/viewReserve')}
+                  >
+                    <FiList className="w-5 h-5" />
+                    <span>View Reserve</span>
+                  </motion.button>
+                  <div className="relative">
+                    <motion.button 
+                      variants={navButtonVariants}
+                      whileHover="hover"
+                      whileTap="tap"
+                      className="flex items-center space-x-2 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium"
+                      onClick={() => setShowSupportTicket(!showSupportTicket)}
+                    >
+                      <FiHelpCircle className="w-5 h-5" />
+                      <span>Support</span>
+                    </motion.button>
+                    <AnimatePresence>
+                      {showSupportTicket && <SupportTicketPopup />}
+                    </AnimatePresence>
+                  </div>
+                  <NotificationBell />
+                  <motion.button 
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="p-2 text-gray-700 hover:text-green-600 transition-colors"
+                    onClick={() => navigate('/profile')}
+                  >
+                    <FiUser className="w-6 h-6" />
+                  </motion.button>
+                  <motion.button
+                    variants={navButtonVariants}
+                    whileHover="hover"
+                    whileTap="tap"
+                    onClick={() => {
+                      sessionStorage.clear();
+                      localStorage.clear();
+                      navigate('/gsd');
+                      window.location.reload();
+                    }}
+                    className="flex items-center space-x-2 text-red-600 px-4 py-2 rounded-lg text-sm font-medium"
+                  >
+                    <FiLogOut className="w-5 h-5" />
+                    <span>Logout</span>
+                  </motion.button>
+                </nav>
+              </div>
+            </div>
+          </motion.header>
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
+              transition={{ duration: 0.5 }}
+              className="bg-white rounded-2xl shadow-xl p-8 backdrop-blur-sm bg-opacity-80 mb-8"
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium mb-1">{stat.title}</p>
-                  <h3 className="text-2xl font-bold text-gray-800">{stat.value}</h3>
-                </div>
-                <div className={`${stat.color} p-3 rounded-full text-white`}>
-                  <stat.icon className="w-6 h-6" />
-                </div>
-              </div>
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">
+                Welcome back, {userName}! 👋
+              </h2>
+              <p className="text-gray-600 text-lg">
+                Here's what's happening with your reservations today.
+              </p>
             </motion.div>
-          ))}
-        </div>
-
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Recent Activities */}
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="lg:col-span-2 bg-white rounded-xl shadow-md p-6"
-          >
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Recent Activities</h3>
-            <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div key={index} className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
-                  <div className={`
-                    p-2 rounded-full 
-                    ${activity.type === 'Approved' ? 'bg-green-100 text-green-600' :
-                      activity.type === 'Pending' ? 'bg-yellow-100 text-yellow-600' :
-                      activity.type === 'Cancelled' ? 'bg-red-100 text-red-600' :
-                      'bg-blue-100 text-blue-600'}
-                  `}>
-                    <FiBarChart2 className="w-4 h-4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {statsData.map((stat, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-gray-500 text-sm font-medium mb-1">{stat.title}</p>
+                      <h3 className="text-2xl font-bold text-gray-800">{stat.value}</h3>
+                    </div>
+                    <div className={`${stat.color} p-3 rounded-full text-white`}>
+                      <stat.icon className="w-6 h-6" />
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-gray-800 font-medium">{activity.message}</p>
-                    <p className="text-gray-400 text-sm">{activity.time}</p>
-                  </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </motion.div>
-
-          {/* Quick Actions */}
-          <motion.div 
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5 }}
-            className="bg-white rounded-xl shadow-md p-6"
-          >
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
-            <div className="space-y-4">
-              <button className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors">
-                <FiCalendar className="w-5 h-5" />
-                <span>New Reservation</span>
-              </button>
-              <button className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors">
-                <FiList className="w-5 h-5" />
-                <span>View Schedule</span>
-              </button>
-              <button className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors">
-                <FiHelpCircle className="w-5 h-5" />
-                <span>Get Help</span>
-              </button>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+                className="lg:col-span-2 bg-white rounded-xl shadow-md p-6"
+              >
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Recent Activities</h3>
+                <div className="space-y-4">
+                  {recentActivities.map((activity, index) => (
+                    <div key={index} className="flex items-start space-x-4 p-3 hover:bg-gray-50 rounded-lg transition-colors">
+                      <div className={`
+                        p-2 rounded-full 
+                        ${activity.type === 'Approved' ? 'bg-green-100 text-green-600' :
+                          activity.type === 'Pending' ? 'bg-yellow-100 text-yellow-600' :
+                          activity.type === 'Cancelled' ? 'bg-red-100 text-red-600' :
+                          'bg-blue-100 text-blue-600'}
+                      `}>
+                        <FiBarChart2 className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-gray-800 font-medium">{activity.message}</p>
+                        <p className="text-gray-400 text-sm">{activity.time}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+              <motion.div 
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+                className="bg-white rounded-xl shadow-md p-6"
+              >
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Quick Actions</h3>
+                <div className="space-y-4">
+                  <button className="w-full bg-green-50 hover:bg-green-100 text-green-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors">
+                    <FiCalendar className="w-5 h-5" />
+                    <span>New Reservation</span>
+                  </button>
+                  <button className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors">
+                    <FiList className="w-5 h-5" />
+                    <span>View Schedule</span>
+                  </button>
+                  <button className="w-full bg-purple-50 hover:bg-purple-100 text-purple-700 py-3 px-4 rounded-lg flex items-center space-x-3 transition-colors">
+                    <FiHelpCircle className="w-5 h-5" />
+                    <span>Get Help</span>
+                  </button>
+                </div>
+              </motion.div>
             </div>
-          </motion.div>
-        </div>
-      </main>
-
-      <ReservationCalendar 
-        isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
-      />
+          </main>
+          <ReservationCalendar 
+            isOpen={isCalendarOpen}
+            onClose={() => setIsCalendarOpen(false)}
+          />
+        </motion.div>
+      )}
     </div>
   );
 };

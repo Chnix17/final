@@ -115,26 +115,36 @@ function Logins() {
                 if (user.status === "success" && user.data) {
                     const userData = user.data;
                     
-                    // Set common localStorage items
+                    // Set common localStorage items with additional fields
                     localStorage.setItem("user_id", userData.user_id);
                     localStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
                     localStorage.setItem("school_id", userData.school_id);
                     localStorage.setItem("contact_number", userData.contact_number);
                     localStorage.setItem("user_level", userData.user_level_name);
+                    localStorage.setItem("user_level_desc", userData.user_level_desc);
                     localStorage.setItem("user_level_id", userData.user_level_id);
                     localStorage.setItem("department_id", userData.department_id);
+                    localStorage.setItem("department_name", userData.department_name);
                     localStorage.setItem("profile_pic", userData.profile_pic || "");
+                    localStorage.setItem("email", userData.email || ""); // Set empty string if email is null
+                    localStorage.setItem("created_at", userData.created_at);
+                    localStorage.setItem("updated_at", userData.updated_at);
                     localStorage.setItem("loggedIn", "true");
 
-                    // Add session storage items
+                    // Add session storage items with additional fields
                     sessionStorage.setItem("user_id", userData.user_id);
                     sessionStorage.setItem("name", `${userData.firstname} ${userData.middlename} ${userData.lastname}`.trim());
                     sessionStorage.setItem("school_id", userData.school_id);
                     sessionStorage.setItem("contact_number", userData.contact_number);
                     sessionStorage.setItem("user_level", userData.user_level_name);
+                    sessionStorage.setItem("user_level_desc", userData.user_level_desc);
                     sessionStorage.setItem("user_level_id", userData.user_level_id);
                     sessionStorage.setItem("department_id", userData.department_id);
+                    sessionStorage.setItem("department_name", userData.department_name);
                     sessionStorage.setItem("profile_pic", userData.profile_pic || "");
+                    sessionStorage.setItem("email", userData.email || ""); // Set empty string if email is null
+                    sessionStorage.setItem("created_at", userData.created_at);
+                    sessionStorage.setItem("updated_at", userData.updated_at);
                     sessionStorage.setItem("loggedIn", "true");
 
                     if (userData.user_level_name === "Super Admin") {
@@ -144,12 +154,12 @@ function Logins() {
                         notify("Personnel Login Successful");
                         navigateTo("/personeldashboard");
                     } else if (userData.user_level_name === "Admin") {
-                        notify("Personnel Login Successful");
+                        notify("Admin Login Successful");
                         navigateTo("/adminDashboard");
-                    }else if (userData.user_level_name === "Department Head") {
+                    } else if (userData.user_level_name === "Dean") {
                         notify("Dean Login Successful");
-                        navigateTo("/deanDashboard");
-                    }else {
+                        navigateTo("/deandashboard");  // Changed to lowercase to match route
+                    } else {
                         notify("User Login Successful");
                         navigateTo("/dashboard");
                     }
