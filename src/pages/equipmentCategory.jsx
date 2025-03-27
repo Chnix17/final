@@ -71,11 +71,17 @@ const EquipmentCategories = () => {
         }
 
         try {
-            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', 
-                new URLSearchParams({ 
-                    operation: 'deleteEquipmentCategory', 
-                    equipment_category_id: selectedCategoryId  // Changed from categoryId to equipment_category_id
-                })
+            const response = await axios.post(
+                'http://localhost/coc/gsd/delete_master.php',
+                JSON.stringify({
+                    operation: 'deleteEquipmentCategory',
+                    equipmentCategoryId: selectedCategoryId
+                }),
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
             );
             
             if (response.data.status === 'success') {

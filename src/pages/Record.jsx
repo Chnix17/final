@@ -28,7 +28,7 @@ import { EyeOutlined, UserOutlined, ClockCircleOutlined, TeamOutlined, CarOutlin
 import moment from 'moment';
 
 const { Search } = Input;
-const { Title } = Typography;
+const { Title, Text } = Typography;  // Add Text here
 
 // Add theme constants
 const themeColors = {
@@ -77,7 +77,6 @@ const getStatusColor = (status) => {
 
 // Move DetailModal outside of Record component
 const DetailModal = ({ visible, record, onClose, theme }) => {
-  const [activeTab, setActiveTab] = useState('1');
   const [modalData, setModalData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -111,141 +110,37 @@ const DetailModal = ({ visible, record, onClose, theme }) => {
     fetchData();
   }, [visible, record]);
 
-  // Replace detailedData with modalData in the render logic
-  const VenueView = () => (
-    <div className="p-4">
-      {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <Spin size="large" />
-        </div>
-      ) : (
-        <Descriptions bordered column={1}>
-          <Descriptions.Item label="Venue Name">{modalData?.venue?.venue_name}</Descriptions.Item>
-          {/* Update all detailedData references to modalData */}
-          <Descriptions.Item label="Form Name">{modalData?.venue?.venue_form_name}</Descriptions.Item>
-          <Descriptions.Item label="Event Title">{modalData?.venue?.venue_form_event_title}</Descriptions.Item>
-          <Descriptions.Item label="Description">{modalData?.venue?.venue_form_description}</Descriptions.Item>
-          <Descriptions.Item label="Participants">{modalData?.venue?.venue_participants}</Descriptions.Item>
-          <Descriptions.Item label="Start Date">
-            {moment(modalData?.venue?.venue_form_start_date).format('MMM DD, YYYY hh:mm A')}
-          </Descriptions.Item>
-          <Descriptions.Item label="End Date">
-            {moment(modalData?.venue?.venue_form_end_date).format('MMM DD, YYYY hh:mm A')}
-          </Descriptions.Item>
-          <Descriptions.Item label="Requester">{modalData?.venue?.venue_form_user_full_name}</Descriptions.Item>
-          <Descriptions.Item label="Approval Status">
-            <Tag color={getStatusColor(record?.approval_status)}>{record?.approval_status}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Request Status">
-            <Tag color={getStatusColor(modalData?.status_request)}>{modalData?.status_request}</Tag>
-          </Descriptions.Item>
-        </Descriptions>
-      )}
-    </div>
-  );
-
-  const VehicleView = () => (
-    <div className="p-4">
-      {isLoading ? (
-        <div style={{ textAlign: 'center', padding: '20px' }}>
-          <Spin size="large" />
-        </div>
-      ) : (
-        <>
-          <Descriptions bordered column={1}>
-            <Descriptions.Item label="Vehicle Details">
-              <div style={{ padding: '8px' }}>
-                <Row gutter={[16, 16]}>
-                  <Col span={12}>
-                    <strong>Make:</strong> {modalData?.vehicle?.vehicle_make}
-                  </Col>
-                  <Col span={12}>
-                    <strong>Model:</strong> {modalData?.vehicle?.vehicle_model}
-                  </Col>
-                  <Col span={12}>
-                    <strong>Category:</strong> {modalData?.vehicle?.vehicle_category}
-                  </Col>
-                  <Col span={12}>
-                    <strong>License:</strong> {modalData?.vehicle?.vehicle_license}
-                  </Col>
-                </Row>
-              </div>
-            </Descriptions.Item>
-            <Descriptions.Item label="Form Name">{modalData?.vehicle?.vehicle_form_name}</Descriptions.Item>
-            <Descriptions.Item label="Purpose">{modalData?.vehicle?.vehicle_form_purpose}</Descriptions.Item>
-            <Descriptions.Item label="Destination">{modalData?.vehicle?.vehicle_form_destination}</Descriptions.Item>
-            <Descriptions.Item label="Start Date">
-              {modalData?.vehicle?.vehicle_form_start_date && 
-              moment(modalData?.vehicle?.vehicle_form_start_date).format('MMM DD, YYYY hh:mm A')}
-            </Descriptions.Item>
-            <Descriptions.Item label="End Date">
-              {modalData?.vehicle?.vehicle_form_end_date && 
-              moment(modalData?.vehicle?.vehicle_form_end_date).format('MMM DD, YYYY hh:mm A')}
-            </Descriptions.Item>
-            <Descriptions.Item label="Requester">{modalData?.vehicle?.vehicle_form_user_full_name}</Descriptions.Item>
-            <Descriptions.Item label="Approval Status">
-              <Tag color={getStatusColor(record?.approval_status)}>{record?.approval_status}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="Request Status">
-              <Tag color={getStatusColor(modalData?.status_request)}>{modalData?.status_request}</Tag>
-            </Descriptions.Item>
-          </Descriptions>
-          
-          {modalData?.passengers?.length > 0 && (
-            <div style={{ marginTop: '24px' }}>
-              <Title level={4}>Passengers</Title>
-              <Table
-                dataSource={modalData.passengers}
-                columns={[
-                  { 
-                    title: 'Name',
-                    dataIndex: 'passenger_name',
-                    key: 'passenger_name'
-                  },
-                  { 
-                    title: 'ID',
-                    dataIndex: 'passenger_id',
-                    key: 'passenger_id'
-                  }
-                ]}
-                pagination={false}
-                bordered
-                size="small"
-              />
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-
-  const items = [
-    {
-      key: '1',
-      label: 'Details',
-      children: record?.form_type === 'Venue' ? <VenueView /> : <VehicleView />
-    },
-    {
-      key: '2',
-      label: 'Equipment',
-      children: (
-        <div className="p-4">
-          {modalData?.equipment && (
-            <Descriptions bordered>
-              <Descriptions.Item label="Equipment Name">{modalData.equipment.equipment_name}</Descriptions.Item>
-              <Descriptions.Item label="Quantity">{modalData.equipment.reservation_equipment_quantity}</Descriptions.Item>
-            </Descriptions>
-          )}
-        </div>
-      )
-    }
-  ];
+  const ReservedItemsList = ({ items, type }) => {
+    if (!items || items.length === 0) return null;
+    
+    return (
+      <div style={{ marginBottom: '12px' }}>
+        {items.map((item, index) => (
+          <Tag
+            key={index}
+            style={{
+              padding: '4px 12px',
+              margin: '4px',
+              borderRadius: '4px',
+              fontSize: '14px',
+              background: '#f5f5f5',
+              border: '1px solid #d9d9d9'
+            }}
+          >
+            {type === 'venue' ? item.venue_name :
+             type === 'vehicle' ? item.vehicle_name :
+             item.equipment_name}
+          </Tag>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <Modal
       title={
         <span style={{ color: theme.primary }}>
-          Reservation Details - {record?.reservation_event_title}
+          Reservation Details - {modalData?.reservation_title}
         </span>
       }
       open={visible}
@@ -267,14 +162,69 @@ const DetailModal = ({ visible, record, onClose, theme }) => {
         borderRadius: '12px',
         overflow: 'hidden'
       }}
-      className="detail-modal"
     >
-      <Tabs 
-        defaultActiveKey="1" 
-        items={items}
-        onChange={setActiveTab}
-        className="detail-tabs"
-      />
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          <Spin size="large" />
+        </div>
+      ) : (
+        <div className="p-4">
+          <Descriptions bordered column={1}>
+            <Descriptions.Item label="Event Title">{modalData?.reservation_title}</Descriptions.Item>
+            <Descriptions.Item label="Description">{modalData?.reservation_description}</Descriptions.Item>
+            <Descriptions.Item label="Requester">
+              <Space>
+                <UserOutlined />
+                {modalData?.full_name}
+                <Tag color="blue">{modalData?.department_name}</Tag>
+              </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="Participants">{modalData?.reservation_participants}</Descriptions.Item>
+            <Descriptions.Item label="Start Date">
+              {moment(modalData?.reservation_start_date).format('MMM DD, YYYY hh:mm A')}
+            </Descriptions.Item>
+            <Descriptions.Item label="End Date">
+              {moment(modalData?.reservation_end_date).format('MMM DD, YYYY hh:mm A')}
+            </Descriptions.Item>
+            <Descriptions.Item label="Status">
+              <Tag color={getStatusColor(modalData?.status_request)}>{modalData?.status_request}</Tag>
+            </Descriptions.Item>
+          </Descriptions>
+
+          {(modalData?.venues?.length > 0 ||
+            modalData?.vehicles?.length > 0 ||
+            modalData?.equipment?.length > 0) && (
+            <>
+              <hr style={{ margin: '24px 0', border: '1px solid #f0f0f0' }} />
+              
+              <div style={{ marginTop: '20px' }}>
+                <Title level={5} style={{ marginBottom: '16px' }}>Reserved Items</Title>
+                
+                {modalData?.venues?.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text type="secondary" style={{ fontSize: '13px' }}>Venues</Text>
+                    <ReservedItemsList items={modalData.venues} type="venue" />
+                  </div>
+                )}
+
+                {modalData?.vehicles?.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text type="secondary" style={{ fontSize: '13px' }}>Vehicles</Text>
+                    <ReservedItemsList items={modalData.vehicles} type="vehicle" />
+                  </div>
+                )}
+
+                {modalData?.equipment?.length > 0 && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text type="secondary" style={{ fontSize: '13px' }}>Equipment</Text>
+                    <ReservedItemsList items={modalData.equipment} type="equipment" />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </Modal>
   );
 };
@@ -286,6 +236,7 @@ const Record = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [activeTab, setActiveTab] = useState('1');
 
   useEffect(() => {
     fetchReservations();
@@ -320,88 +271,50 @@ const Record = () => {
   };
 
   const consolidateReservations = (data) => {
-    // Group by reservation_id
-    const groupedData = data.reduce((acc, item) => {
-      if (!acc[item.reservation_id]) {
-        acc[item.reservation_id] = [];
-      }
-      acc[item.reservation_id].push(item);
-      return acc;
-    }, {});
-  
-    // Consolidate each group
-    return Object.values(groupedData).map(group => {
-      const approvedStatus = group.find(item => item.reservation_status === 'Approved');
-      const reservedStatus = group.find(item => item.reservation_status === 'Reserved');
-      const item = approvedStatus || group[0]; // Use approved status item if exists, otherwise first item
-  
-      return {
-        reservation_id: item.reservation_id,
-        form_name: item.venue_form_name || item.vehicle_form_name || 'N/A',
-        form_type: item.venue_form_name ? 'Venue' : item.vehicle_form_name ? 'Vehicle' : 'N/A',
-        created_at: item.reservation_created_at,
-        approval_status: approvedStatus ? 'Approved' : item.reservation_status,
-        reservation_status: reservedStatus ? 'Reserved' : item.reservation_status,
-        details: item.venue_details || item.vehicle_details || 'N/A'
-      };
-    });
+    return data.map(item => ({
+      reservation_id: item.reservation_id,
+      title: item.reservation_title,
+      description: item.reservation_description,
+      start_date: item.reservation_start_date,
+      end_date: item.reservation_end_date,
+      status: item.reservation_status_name,
+      requester: item.user_full_name
+    }));
   };
   
   const columns = [
     {
-      title: 'Reservation ID',
-      dataIndex: 'reservation_id',
-      sorter: (a, b) => a.reservation_id - b.reservation_id,
+      title: 'Title',
+      dataIndex: 'title',
+      sorter: (a, b) => a.title.localeCompare(b.title),
     },
     {
-      title: 'Form Name',
-      dataIndex: 'form_name',
-      sorter: (a, b) => a.form_name.localeCompare(b.form_name),
-    },
-    {
-      title: 'Type',
-      dataIndex: 'form_type',
-      filters: [
-        { text: 'Venue', value: 'Venue' },
-        { text: 'Vehicle', value: 'Vehicle' },
-      ],
-      onFilter: (value, record) => record.form_type === value,
-    },
-    {
-      title: 'Details',
-      dataIndex: 'details',
+      title: 'Description',
+      dataIndex: 'description',
       ellipsis: true,
     },
     {
-      title: 'Created Date',
-      dataIndex: 'created_at',
+      title: 'Start Date',
+      dataIndex: 'start_date',
       render: (date) => moment(date).format('MMM DD, YYYY hh:mm A'),
-      sorter: (a, b) => moment(a.created_at).unix() - moment(b.created_at).unix(),
+      sorter: (a, b) => moment(a.start_date).unix() - moment(b.start_date).unix(),
     },
     {
-      title: 'Approval Status',
-      dataIndex: 'approval_status',
+      title: 'End Date',
+      dataIndex: 'end_date',
+      render: (date) => moment(date).format('MMM DD, YYYY hh:mm A'),
+      sorter: (a, b) => moment(a.end_date).unix() - moment(b.end_date).unix(),
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
       render: (status) => (
         <Tag color={getStatusColor(status)}>{status}</Tag>
       ),
-      filters: [
-        { text: 'Approved', value: 'Approved' },
-        { text: 'Pending', value: 'Pending' },
-        { text: 'Declined', value: 'Declined' },
-      ],
-      onFilter: (value, record) => record.approval_status === value,
     },
     {
-      title: 'Reservation Status',
-      dataIndex: 'reservation_status',
-      render: (status) => (
-        <Tag color={getStatusColor(status)}>{status}</Tag>
-      ),
-      filters: [
-        { text: 'Reserved', value: 'Reserved' },
-        { text: 'Cancelled', value: 'Cancelled' },
-      ],
-      onFilter: (value, record) => record.reservation_status === value,
+      title: 'Requester',
+      dataIndex: 'requester',
     },
     {
       title: 'Action',
@@ -419,15 +332,71 @@ const Record = () => {
     }
   ];
 
-  const filteredReservations = reservations.filter(reservation => {
-    const searchLower = searchText.toLowerCase();
-    return (
-      reservation.form_name.toLowerCase().includes(searchLower) ||
-      reservation.form_type.toLowerCase().includes(searchLower) ||
-      reservation.approval_status.toLowerCase().includes(searchLower) ||
-      (reservation.reservation_status && reservation.reservation_status.toLowerCase().includes(searchLower))
-    );
-  });
+  const getFilteredReservations = (status) => {
+    return reservations.filter(reservation => {
+      const searchLower = searchText.toLowerCase();
+      const matchesSearch = (
+        reservation.title?.toLowerCase().includes(searchLower) ||
+        reservation.description?.toLowerCase().includes(searchLower) ||
+        reservation.requester?.toLowerCase().includes(searchLower)
+      );
+
+      if (status === 'active') {
+        return matchesSearch && reservation.status === 'Reserved';
+      } else {
+        return matchesSearch && reservation.status === 'Decline';
+      }
+    });
+  };
+
+  const tabItems = [
+    {
+      key: '1',
+      label: 'Active Reservations',
+      children: (
+        <Table
+          columns={columns}
+          dataSource={getFilteredReservations('active')}
+          rowKey="approval_id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} reservations`,
+          }}
+          scroll={{ x: 1000 }}
+          style={{
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}
+          className="record-table"
+        />
+      )
+    },
+    {
+      key: '2',
+      label: 'Completed/Declined Reservations',
+      children: (
+        <Table
+          columns={columns}
+          dataSource={getFilteredReservations('completed')}
+          rowKey="approval_id"
+          loading={loading}
+          pagination={{
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} reservations`,
+          }}
+          scroll={{ x: 1000 }}
+          style={{
+            borderRadius: '8px',
+            overflow: 'hidden'
+          }}
+          className="record-table"
+        />
+      )
+    }
+  ];
 
   const showModal = (record) => {
     setSelectedRecord(record);
@@ -475,24 +444,14 @@ const Record = () => {
               />
             </Space>
           </div>
-    
-          <Table
-            columns={columns}
-            dataSource={filteredReservations}
-            rowKey="approval_id"
-            loading={loading}
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total) => `Total ${total} reservations`,
-            }}
-            scroll={{ x: 1000 }}
-            style={{
-              borderRadius: '8px',
-              overflow: 'hidden'
-            }}
-            className="record-table"
+
+          <Tabs 
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={tabItems}
+            style={{ marginTop: '16px' }}
           />
+
           <DetailModal
             visible={isModalVisible}
             record={selectedRecord}

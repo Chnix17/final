@@ -67,7 +67,17 @@ const Departments = () => {
 
     const confirmDelete = async () => {
         try {
-            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', new URLSearchParams({ operation: 'deleteDepartment', department_id: selectedDepartmentId }));
+            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', 
+                {
+                    operation: 'deleteDepartment',
+                    departmentId: selectedDepartmentId  // Changed from department_id to departmentId
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
             if (response.data.status === 'success') {
                 setDepartments(departments.filter(dept => dept.departments_id !== selectedDepartmentId));
                 setFilteredDepartments(filteredDepartments.filter(dept => dept.departments_id !== selectedDepartmentId));

@@ -30,7 +30,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
         if (userRole === 'Super Admin' || userRole === 'Admin') return '/adminDashboard';
         if (userRole === 'Personnel') return '/personnelDashboard';
         if (userRole === 'Dean' || userRole === 'Secretary') return '/deanDashboard';
-        if (userRole === 'user') return '/dashboard';
+        if (userRole === 'Faculty/Staff') return '/dashboard';
         return '/gsd';
     };
 

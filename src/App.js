@@ -40,6 +40,7 @@ import AssignPersonnel from './pages/AssignPersonnel';
 import LandCalendar from './pages/landCalendar';
 import Archive from './pages/archive';
 import NotFound from './components/NotFound';
+import Checklists from './pages/Checklist';
 
 export const ThemeContext = createContext();
 
@@ -81,7 +82,8 @@ const App = () => {
             '/deanAddReservation', '/viewApproval', '/dashboard',
             '/viewReserve', '/addReservation', '/profile1',
             '/settings', '/calendar', '/chat', '/personnelDashboard',
-            '/viewTask', '/'
+            '/viewTask', '/Master', '/vehicleCategory', '/',
+            '/Checklist'
         ];
 
         if (!validPaths.includes(location.pathname)) {
@@ -118,6 +120,7 @@ const App = () => {
                         <Route path="/vehiclemodel" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><VehicleModel /></ProtectedRoute>} />
                         <Route path="/AssignPersonnel" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><AssignPersonnel /></ProtectedRoute>} />
                         <Route path="/LandCalendar" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><LandCalendar /></ProtectedRoute>} />
+                        <Route path="/Checklist" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Checklists /></ProtectedRoute>} />
 
                         <Route path="/record" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><Record /></ProtectedRoute>} />
                         <Route path="/ViewRequest" element={<ProtectedRoute allowedRoles={['Admin', 'Super Admin']}><ViewRequest /></ProtectedRoute>} />
@@ -133,15 +136,15 @@ const App = () => {
                         <Route path="/viewApproval" element={<ProtectedRoute allowedRoles={['Dean', 'Secretary']}><ViewApproval /></ProtectedRoute>} />
                         
                         {/* User Routes */}
-                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['user']}><Dashboard /></ProtectedRoute>} />
-                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['user']}><ViewReserve /></ProtectedRoute>} />
-                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['user']}><AddReservation /></ProtectedRoute>} />
+                        <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['Faculty/Staff']}><Dashboard /></ProtectedRoute>} />
+                        <Route path="/viewReserve" element={<ProtectedRoute allowedRoles={['Faculty/Staff']}><ViewReserve /></ProtectedRoute>} />
+                        <Route path="/addReservation" element={<ProtectedRoute allowedRoles={['Faculty/Staff']}><AddReservation /></ProtectedRoute>} />
                         
                         {/* Shared Routes (accessible by all authenticated users) */}
-                        <Route path="/profile1" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Pofiles /></ProtectedRoute>} />
-                        <Route path="/settings" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Settings /></ProtectedRoute>} />
-                        <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Calendar /></ProtectedRoute>} />
-                        <Route path="/chat" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'user']}><Chat /></ProtectedRoute>} />
+                        <Route path="/profile1" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Pofiles /></ProtectedRoute>} />
+                        <Route path="/settings" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Settings /></ProtectedRoute>} />
+                        <Route path="/calendar" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Calendar /></ProtectedRoute>} />
+                        <Route path="/chat" element={<ProtectedRoute allowedRoles={['Admin', 'Dean', 'Secretary', 'Faculty/Staff']}><Chat /></ProtectedRoute>} />
 
                         {/* Personnel Routes */}
                         <Route path="/personnelDashboard" element={<ProtectedRoute allowedRoles={['Personnel']}><PersonnelDashboard /></ProtectedRoute>} />

@@ -150,7 +150,15 @@ const VehicleModels = () => {
   const confirmDelete = async () => {
     try {
       const response = await axios.post('http://localhost/coc/gsd/delete_master.php', 
-        new URLSearchParams({ operation: 'deleteModel', model_id: selectedModelId })
+        {
+          operation: 'deleteModel',
+          modelId: selectedModelId
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
       if (response.data.status === 'success') {
         setModels(models.filter(model => model.vehicle_model_id !== selectedModelId));

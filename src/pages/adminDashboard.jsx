@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
+import { Line } from '@ant-design/plots';
+import { Select } from 'antd';
 
 const formatDate = (dateInput) => {
     if (!dateInput) return 'N/A';
@@ -90,6 +92,8 @@ const Dashboard = () => {
     const [requestsPage, setRequestsPage] = useState(1);
     const [tasksPage, setTasksPage] = useState(1);
     const itemsPerPage = 3;
+    const [reservationData, setReservationData] = useState([]);
+    const [timeFilter, setTimeFilter] = useState('365');
 
     // Read dark mode preference from localStorage
     useEffect(() => {
@@ -505,6 +509,124 @@ const Dashboard = () => {
         );
     };
 
+    useEffect(() => {
+        fetchReservationChartData();
+    }, [timeFilter]);
+
+    const fetchReservationChartData = async () => {
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/get_totals.php', {
+                operation: 'fetchReservedAndDeclinedReservations'
+            });
+
+            if (response.data.status === 'success') {
+                const data = processChartData(response.data.data, timeFilter);
+                setReservationData(data);
+            }
+        } catch (error) {
+            console.error('Error fetching chart data:', error);
+        }
+    };
+
+    const processChartData = (data, filterDays) => {
+        const now = new Date();
+        const startDate = new Date(now.setDate(now.getDate() - parseInt(filterDays)));
+        
+        let dateFormat;
+        if (filterDays === '365') {
+            dateFormat = (date) => date.toLocaleString('default', { month: 'long' });
+        } else {
+            dateFormat = (date) => date.toISOString().split('T')[0];
+        }
+
+        const countsByDate = new Map();
+        
+        // Initialize with zeros
+        if (filterDays === '365') {
+            const months = [
+                'January', 'February', 'March', 'April', 'May', 'June',
+                'July', 'August', 'September', 'October', 'November', 'December'
+            ];
+            months.forEach(month => {
+                countsByDate.set(month, { Reserved: 0, Declined: 0 });
+            });
+        } else {
+            for (let d = new Date(startDate); d <= new Date(); d.setDate(d.getDate() + 1)) {
+                const formattedDate = dateFormat(new Date(d));
+                countsByDate.set(formattedDate, { Reserved: 0, Declined: 0 });
+            }
+        }
+
+        // Process the data
+        data.forEach(item => {
+            const date = new Date(item.reservation_updated_at);
+            if (date >= startDate) {
+                const key = dateFormat(date);
+                if (countsByDate.has(key)) {
+                    const counts = countsByDate.get(key);
+                    if (item.status_name === 'Reserved') {
+                        counts.Reserved = (counts.Reserved || 0) + 1;
+                    } else if (item.status_name === 'Decline') {
+                        counts.Declined = (counts.Declined || 0) + 1;
+                    }
+                }
+            }
+        });
+
+        // Convert to chart format
+        const chartData = [];
+        countsByDate.forEach((counts, date) => {
+            chartData.push(
+                {
+                    date,
+                    status: 'Reserved',
+                    count: counts.Reserved
+                },
+                {
+                    date,
+                    status: 'Declined',
+                    count: counts.Declined
+                }
+            );
+        });
+
+        return chartData;
+    };
+
+    const config = {
+        data: reservationData,
+        xField: 'date',
+        yField: 'count',
+        seriesField: 'status',
+        smooth: true,
+        animation: {
+            appear: {
+                animation: 'path-in',
+                duration: 1000
+            }
+        },
+        color: ['#4CAF50', '#FF5252'], // Green for Reserved, Red for Declined
+        legend: {
+            position: 'top'
+        },
+        yAxis: {
+            label: {
+                formatter: (v) => Math.floor(v) // Ensure whole numbers
+            },
+            min: 0 // Start from 0
+        },
+        lineStyle: {
+            lineWidth: 3 // Make lines thicker
+        },
+        point: {
+            size: 5,
+            shape: 'diamond',
+            style: {
+                opacity: 0.8
+            }
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-screen bg-gray-100">
@@ -583,6 +705,25 @@ const Dashboard = () => {
                                 icon={<FaUsers />}
                                 color="bg-red-500"
                             />
+                        </div>
+
+                        {/* Add Chart Section */}
+                        <div className="bg-white rounded-lg shadow-sm p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-xl font-semibold text-gray-800">Reservation Statistics</h2>
+                                <Select
+                                    defaultValue="365"
+                                    style={{ width: 120 }}
+                                    onChange={setTimeFilter}
+                                    options={[
+                                        { value: '7', label: '7 Days' },
+                                        { value: '30', label: '30 Days' },
+                                        { value: '90', label: '90 Days' },
+                                        { value: '365', label: 'Year' },
+                                    ]}
+                                />
+                            </div>
+                            <Line {...config} />
                         </div>
 
                         {/* Recent Requests and Completed Tasks Row */}

@@ -10,7 +10,7 @@ const AssignPersonnel = () => {
   const [personnel, setPersonnel] = useState([]);
   const [formData, setFormData] = useState({
     personnel: '',
-    checklists: [{ name: '', status: 'pending' }]
+    checklists: []
   });
   const [errorMessage, setErrorMessage] = useState('');
   
@@ -19,138 +19,162 @@ const AssignPersonnel = () => {
   const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
   const [selectedChecklists, setSelectedChecklists] = useState([]);
 
-  const handleOpenModal = (reservation) => {
-    setSelectedReservation(reservation);
+  const handleOpenModal = async (reservation) => {
+    try {
+      const response = await axios.post('http://localhost/coc/gsd/fetch2.php', {
+        operation: 'getReservedById',
+        reservation_id: reservation.id
+      });
+
+      if (response.data.status === 'success') {
+        const { data } = response.data;
+        let checklists = [];
+        
+        // Process venues
+        if (data.venues && data.venues.length > 0) {
+          data.venues.forEach(venue => {
+            if (venue.checklists && venue.checklists.length > 0) {
+              const venueItems = venue.checklists.map(item => ({
+                id: item.checklist_venue_id,
+                name: item.checklist_name,
+                type: 'venue',
+                reservation_venue_id: venue.reservation_venue_id
+              }));
+              checklists.push({
+                category: `Venue: ${venue.name}`,
+                items: venueItems
+              });
+            }
+          });
+        }
+
+        // Process equipment
+        if (data.equipments && data.equipments.length > 0) {
+          data.equipments.forEach(equipment => {
+            if (equipment.checklists && equipment.checklists.length > 0) {
+              const equipmentItems = equipment.checklists.map(item => ({
+                id: item.checklist_equipment_id,
+                name: item.checklist_name,
+                type: 'equipment',
+                reservation_equipment_id: equipment.reservation_equipment_id
+              }));
+              checklists.push({
+                category: `Equipment: ${equipment.name} (Qty: ${equipment.quantity})`,
+                items: equipmentItems
+              });
+            }
+          });
+        }
+
+        // Process vehicles
+        if (data.vehicles && data.vehicles.length > 0) {
+          data.vehicles.forEach(vehicle => {
+            if (vehicle.checklists && vehicle.checklists.length > 0) {
+              const vehicleItems = vehicle.checklists.map(item => ({
+                id: item.checklist_vehicle_id,
+                name: item.checklist_name,
+                type: 'vehicle',
+                reservation_vehicle_id: vehicle.reservation_vehicle_id
+              }));
+              checklists.push({
+                category: `Vehicle: ${vehicle.name}`,
+                items: vehicleItems
+              });
+            }
+          });
+        }
+
+        setSelectedReservation(reservation);
+        setFormData({
+          personnel: '',
+          checklists: checklists
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching reservation details:', error);
+      setFormData({ personnel: '', checklists: [] });
+    }
     setIsModalOpen(true);
   };
 
-  const addChecklist = () => {
-    setFormData({
-      ...formData,
-      checklists: [...formData.checklists, { name: '', status: 'pending' }]
-    });
-  };
-
-  const removeChecklist = (index) => {
-    setFormData({
-      ...formData,
-      checklists: formData.checklists.filter((_, i) => i !== index)
-    });
-  };
-
-  const updateChecklist = (index, value) => {
-    setFormData({
-      ...formData,
-      checklists: formData.checklists.map((item, i) => 
-        i === index ? { ...item, name: value } : item
-      )
-    });
-  };
-
-  const handleSubmitRelease = async (reservationId, personnelId, checklists, type) => {
-    try {
-      let venue_equipment = [];
-      let vehicle = [];
-
-      if (type === 'Venue') {
-        venue_equipment = checklists.map(item => ({
-          name: item.name,
-          isActive: 0
-        }));
-      } else if (type === 'Vehicle') {
-        vehicle = checklists.map(item => ({
-          name: item.name,
-          isActive: 0
-        }));
-      }
-
-      const payload = {
-        operation: 'insertRelease',
-        json: {
-          reservation_id: reservationId, // This is now directly using the reservation_id
-          admin_id: 1,
-          personnel_id: personnelId,
-          venue_equipment,
-          vehicle
-        }
-      };
-
-      console.log('Submitting payload:', payload);
-
-      const response = await axios.post('http://localhost/coc/gsd/records&reports.php', payload, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      console.log('Server response:', response.data);
-
-      if (response.data.status === 'success') {
-        // Update local state after successful submission
-        setReservations(prevReservations => 
-          prevReservations.map(res => 
-            res.id === reservationId ? {
-              ...res,
-              personnel: formData.personnel,
-              checklists: formData.checklists,
-              status: 'Assigned'
-            } : res
-          )
-        );
-        
-        // Reset form and close modal
-        setIsModalOpen(false);
-        setFormData({ personnel: '', checklists: [{ name: '', status: 'pending' }] });
-        setSelectedReservation(null);
-        setErrorMessage('');
-
-        // Refresh the reservations list
-        if (activeTab === 'Not Assigned') {
-          fetchNotAssignedReservations();
-        }
-      } else {
-        setErrorMessage('Failed to submit release. Please try again.');
-      }
-    } catch (error) {
-      console.error('Error submitting release:', error);
-      setErrorMessage(error.message || 'An error occurred while submitting the release.');
-    }
-  };
+  
 
   const handleAssign = async () => {
-    // Reset error message
     setErrorMessage('');
-
-    // Validate form data
     if (!formData.personnel) {
       setErrorMessage('Please select a personnel');
       return;
     }
 
-    if (formData.checklists.length === 0) {
-      setErrorMessage('Please add at least one checklist item');
-      return;
-    }
-
-    if (formData.checklists.some(c => !c.name.trim())) {
-      setErrorMessage('Please fill in all checklist items');
-      return;
-    }
-
-    // Find the selected personnel's ID from the personnel list
     const selectedPersonnelObj = personnel.find(p => p.full_name === formData.personnel);
     if (!selectedPersonnelObj) {
       setErrorMessage('Selected personnel not found');
       return;
     }
 
-    // Submit the release based on the reservation type
-    await handleSubmitRelease(
-      selectedReservation.id,
-      selectedPersonnelObj.jo_personel_id,
-      formData.checklists,
-      selectedReservation.type
-    );
+    try {
+      const checklistIds = [];
+
+      formData.checklists.forEach(category => {
+        category.items.forEach(item => {
+          const entry = {
+            type: item.type,
+            checklist_id: item.id
+          };
+
+          switch (item.type) {
+            case 'venue':
+              entry.reservation_venue_id = item.reservation_venue_id;
+              break;
+            case 'equipment':
+              entry.reservation_equipment_id = item.reservation_equipment_id;
+              break;
+            case 'vehicle':
+              entry.reservation_vehicle_id = item.reservation_vehicle_id;
+              break;
+          }
+
+          checklistIds.push(entry);
+        });
+      });
+
+      const payload = {
+        operation: 'saveChecklist',
+        data: {
+          admin_id: localStorage.getItem("user_id"),
+          personnel_id: selectedPersonnelObj.users_id,
+          checklist_ids: checklistIds
+        }
+      };
+
+      const response = await axios.post('http://localhost/coc/gsd/fetch2.php', payload);
+
+      if (response.data.status === 'success') {
+        setReservations(prev => 
+          prev.map(res => 
+            res.id === selectedReservation.id ? {
+              ...res,
+              personnel: formData.personnel,
+              status: 'Assigned'
+            } : res
+          )
+        );
+        
+        setIsModalOpen(false);
+        setFormData({ personnel: '', checklists: [] });
+        setSelectedReservation(null);
+        setErrorMessage('');
+
+        if (activeTab === 'Not Assigned') {
+          fetchNotAssignedReservations();
+        }
+      } else {
+        setErrorMessage('Failed to assign personnel. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error assigning personnel:', error);
+      setErrorMessage(error.message || 'An error occurred while assigning personnel.');
+    }
   };
 
   const handleComplete = async (reservationId, personnelId) => {
@@ -216,14 +240,14 @@ const AssignPersonnel = () => {
 
       if (response.data.status === 'success' && Array.isArray(response.data.data)) {
         const formattedData = response.data.data.map(item => ({
-          id: item.reservation_id, // Changed from approval_id to reservation_id
+          id: item.reservation_id,
           type: item.venue_form_name ? 'Venue' : 'Vehicle',
-          name: item.venue_form_name || item.vehicle_form_name,
+          name: item.reservation_title || 'Untitled',  // Changed to use reservation_title
           details: item.venue_details || item.vehicle_details,
           personnel: 'N/A',
           checklists: [],
           status: 'Not Assigned',
-          createdAt: item.reservation_date // Changed from approval_created_at to reservation_date
+          createdAt: new Date(item.reservation_created_at).toLocaleString() // Format the date
         }));
         setReservations(formattedData);
       }
@@ -386,7 +410,6 @@ const AssignPersonnel = () => {
               <table className="min-w-full">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type of Form</th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reservation Name</th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Personnel</th>
                     {activeTab !== 'Not Assigned' && (
@@ -410,16 +433,12 @@ const AssignPersonnel = () => {
                       className="hover:bg-gray-50 transition-colors"
                     >
                       <td className="px-6 py-4">
-                        <div className="flex items-center">
-                          <span className="text-sm font-medium text-gray-900">{reservation.type}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{reservation.name}</p>
-                          <p className="text-xs text-gray-400">{new Date(reservation.createdAt).toLocaleString()}</p>
+                          <h1 className="text-sm font-medium text-gray-900">{reservation.name}</h1>
                         </div>
                       </td>
+                      
+                      {/* Rest of the row cells */}
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           {reservation.personnel === 'N/A' ? (
@@ -535,7 +554,7 @@ const AssignPersonnel = () => {
                       >
                         <option value="">Select Personnel</option>
                         {personnel.map((person) => (
-                          <option key={person.jo_personel_id} value={person.full_name}>
+                          <option key={person.users_id} value={person.full_name}>
                             {person.full_name}
                           </option>
                         ))}
@@ -543,35 +562,24 @@ const AssignPersonnel = () => {
                     </div>
 
                     <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-700">Checklists</label>
-                        <button
-                          onClick={addChecklist}
-                          className="text-blue-500 hover:text-blue-600"
-                        >
-                          + Add Checklist
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {formData.checklists.map((checklist, index) => (
-                          <div key={index} className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={checklist.name}
-                              onChange={(e) => updateChecklist(index, e.target.value)}
-                              placeholder="Enter checklist item"
-                              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
-                            <button
-                              onClick={() => removeChecklist(index)}
-                              className="text-red-500 hover:text-red-600"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">Checklists</h3>
+                      <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+                        {formData.checklists.map((categoryList, categoryIndex) => (
+                          <div key={categoryIndex} className="space-y-2">
+                            <h4 className="font-medium text-blue-600">{categoryList.category}</h4>
+                            {categoryList.items.map((checklist, index) => (
+                              <div key={index} className="flex items-center space-x-3 ml-4">
+                                <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                                <span className="text-sm text-gray-700">
+                                  {checklist.name} 
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         ))}
+                        {formData.checklists.length === 0 && (
+                          <p className="text-sm text-gray-500 italic">No checklists available</p>
+                        )}
                       </div>
                     </div>
 

@@ -19,7 +19,7 @@ import {
   DialogContainer,
 } from '../components/core/dialog';
 import { Loader2 } from 'lucide-react';
-import { Modal, Tabs, Badge, Descriptions, Space, Tag, Timeline, Button, Alert } from 'antd';
+import { Modal, Tabs, Badge, Descriptions, Space, Tag, Timeline, Button, Alert, Radio, Table } from 'antd';
 import { 
     CarOutlined, 
     BuildOutlined, 
@@ -30,7 +30,12 @@ import {
     TeamOutlined,
     CheckCircleOutlined,
     CloseCircleOutlined,
-    LoadingOutlined
+    LoadingOutlined,
+    AppstoreOutlined, 
+    UnorderedListOutlined,
+    EyeOutlined,
+    HistoryOutlined,
+    ClockCircleOutlined,  // Add this import
 } from '@ant-design/icons';
 
 const ReservationRequests = () => {
@@ -47,6 +52,8 @@ const ReservationRequests = () => {
     const [startDate, endDate] = dateRange;
     const [isAccepting, setIsAccepting] = useState(false);
     const [isDeclining, setIsDeclining] = useState(false);
+    const [activeTab, setActiveTab] = useState('1');
+    const [viewMode, setViewMode] = useState('grid'); // Add this new state
     const navigate = useNavigate();
     const user_level_id = localStorage.getItem('user_level_id');
 
@@ -86,8 +93,8 @@ const ReservationRequests = () => {
         try {
             const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', 
                 {
-                    operation: 'fetchRequestById',
-                    reservation_id: reservationId
+                    operation: 'fetchRequestById',  
+                    reservation_id: reservationId  
                 },
                 {
                     headers: {
@@ -97,59 +104,12 @@ const ReservationRequests = () => {
             );
 
             if (response.data?.status === 'success' && response.data.data) {
+                // Set the details directly from response
                 const details = response.data.data;
-                
-                // Format equipment data with null checks
-                let formattedEquipment = [];
-                if (details.equipment && Array.isArray(details.equipment)) {
-                    formattedEquipment = details.equipment;
-                } else if (details.equipment && details.equipment.name) {
-                    try {
-                        const names = details.equipment.name.split(',');
-                        const quantities = details.equipment.quantity ? details.equipment.quantity.split(',') : [];
-                        const ids = details.equipment.equipment_ids ? details.equipment.equipment_ids.split(',') : [];
-                        
-                        formattedEquipment = names.map((name, index) => ({
-                            equip_id: ids[index] || '',
-                            equipment_name: name.trim(),
-                            reservation_equipment_quantity: quantities[index] || '1'
-                        }));
-                    } catch (error) {
-                        console.warn('Error formatting equipment:', error);
-                        formattedEquipment = [];
-                    }
-                }
-
-                // Create a formatted details object
-                const formattedDetails = {
-                    ...details,
-                    equipment: formattedEquipment,
-                    // Format venue data with null checks
-                    venue: details.venue ? {
-                        ...details.venue,
-                        venue_name: details.venue.name || 'N/A',
-                        venue_form_name: details.venue.form_name || 'N/A',
-                        venue_form_event_title: details.venue.event_title || 'N/A',
-                        venue_form_description: details.venue.description || 'N/A',
-                        venue_participants: details.venue.participants || '0',
-                        venue_form_start_date: details.venue.start_date,
-                        venue_form_end_date: details.venue.end_date
-                    } : null,
-                    // Format vehicle data with null checks
-                    vehicle: details.vehicle ? {
-                        ...details.vehicle,
-                        vehicle_form_name: details.vehicle.form_name || 'N/A',
-                        vehicle_form_purpose: details.vehicle.purpose || 'N/A',
-                        vehicle_form_destination: details.vehicle.destination || 'N/A',
-                        vehicle_form_start_date: details.vehicle.start_date,
-                        vehicle_form_end_date: details.vehicle.end_date,
-                        drivers: details.vehicle.driver_names || []
-                    } : null
-                };
-
-                setReservationDetails(formattedDetails);
+                setReservationDetails(details);
                 setCurrentRequest({
-                    reservation_id: reservationId
+                    reservation_id: details.reservation_id,
+                    isUnderReview: details.active === "0"
                 });
                 setIsDetailModalOpen(true);
             } else {
@@ -157,7 +117,7 @@ const ReservationRequests = () => {
             }
         } catch (error) {
             console.error('API Error:', error);
-            toast.error(`Error: ${error.response?.data?.message || 'Failed to fetch reservation details'}`);
+            toast.error('Failed to fetch reservation details. Please try again.');
         }
     };
 
@@ -264,6 +224,389 @@ const ReservationRequests = () => {
         }
     };
 
+
+
+    // Add new fetch functions for different request types
+    const fetchPendingRequests = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'fetchRequestReservation'
+            }, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.data?.status === 'success') {
+                // Filter for active === "1"
+                const pendingRequests = response.data.data.filter(request => request.active === "1");
+                setReservations(pendingRequests);
+            }
+        } catch (error) {
+            toast.error('Error fetching pending requests');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchReviewRequests = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'fetchRequestReservation'
+            }, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.data?.status === 'success') {
+                // Filter for active === "0"
+                const reviewRequests = response.data.data.filter(request => request.active === "0");
+                setReservations(reviewRequests);
+            }
+        } catch (error) {
+            toast.error('Error fetching review requests');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchHistoryRequests = async () => {
+        setLoading(true);
+        try {
+            const response = await axios.post('http://localhost/coc/gsd/process_reservation.php', {
+                operation: 'fetchHistoryRequests'
+            }, {
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.data?.status === 'success') {
+                setReservations(response.data.data);
+            }
+        } catch (error) {
+            toast.error('Error fetching history');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Update tab change handler
+    const handleTabChange = (key) => {
+        setActiveTab(key);
+        setReservations([]);
+        switch (key) {
+            case '1':
+                fetchPendingRequests();
+                break;
+            case '2':
+                fetchReviewRequests();
+                break;
+            case '3':
+                fetchHistoryRequests();
+                break;
+            default:
+                break;
+        }
+    };
+
+    useEffect(() => {
+        // Initial load of pending requests
+        fetchPendingRequests();
+    }, []);
+
+    // Add this new component for the view toggle
+    const ViewToggle = () => (
+        <div className="mb-4 flex justify-end">
+            <Radio.Group value={viewMode} onChange={e => setViewMode(e.target.value)}>
+                <Radio.Button value="grid">
+                    <AppstoreOutlined /> Grid
+                </Radio.Button>
+                <Radio.Button value="list">
+                    <UnorderedListOutlined /> List
+                </Radio.Button>
+            </Radio.Group>
+        </div>
+    );
+
+    // Add this new component for rendering requests in list view
+    const ListViewItem = ({ reservation, onClick }) => (
+        <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-white mb-4 p-4 rounded-lg shadow hover:shadow-md transition-shadow"
+        >
+            <div className="flex justify-between items-center">
+                <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                        {getIconForType(reservation.type)}
+                        <h3 className="text-lg font-semibold">
+                            {reservation.reservation_type === "Vehicle Form" 
+                                ? reservation.reservation_destination 
+                                : reservation.reservation_title}
+                        </h3>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2 text-sm text-gray-600">
+                        <div>
+                            <span className="font-medium">Created:</span><br/>
+                            {new Date(reservation.reservation_created_at).toLocaleDateString()}
+                        </div>
+                        <div>
+                            <span className="font-medium">Type:</span><br/>
+                            {reservation.reservation_type}
+                        </div>
+                        <div>
+                            <span className="font-medium">Status:</span><br/>
+                            <span className={`px-2 py-1 rounded-full ${getStatusStyle(reservation.reservation_status)}`}>
+                                {reservation.reservation_status}
+                            </span>
+                        </div>
+                        <div>
+                            {reservation.active === "0" ? (
+                                <Tag color="processing">Waiting for Approval</Tag>
+                            ) : (
+                                <button
+                                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                                    onClick={() => fetchReservationDetails(reservation.reservation_id)}
+                                >
+                                    View Details
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </motion.div>
+    );
+
+    // Add this new Table component
+    const RequestTable = ({ data, onView }) => {
+        const columns = [
+            {
+            title: 'Title',
+            dataIndex: 'reservation_title',
+            key: 'reservation_title',
+            },
+            {
+            title: 'Description',
+            dataIndex: 'reservation_description',
+            key: 'reservation_description',
+            ellipsis: true,
+            },
+            {
+            title: 'Requester',
+            dataIndex: 'requester_name',
+            key: 'requester_name',
+            },
+            {
+            title: 'Created At',
+            dataIndex: 'reservation_created_at',
+            key: 'reservation_created_at',
+            render: (text) => new Date(text).toLocaleString(),
+            },
+            {
+            title: 'Status',
+            dataIndex: 'reservation_status',
+            key: 'reservation_status',
+            render: (status, record) => (
+                <Tag color={
+                record.active === "0" ? 'gold' :
+                status === 'Pending' ? 'blue' :
+                status === 'Approved' ? 'green' :
+                status === 'Declined' ? 'red' : 'default'
+                }>
+                {record.active === "0" ? "Final Confirmation" : "Waiting for Approval"}
+                </Tag>
+            ),
+            },
+            {
+            title: 'Action',
+            key: 'action',
+            render: (_, record) => (
+                <Button 
+                type="primary"
+                onClick={() => fetchReservationDetails(record.reservation_id)}
+                icon={<EyeOutlined />}
+                >
+                View
+                </Button>
+            ),
+            },
+        ];
+
+        return (
+            <Table
+                columns={columns}
+                dataSource={data}
+                rowKey="reservation_id"
+                pagination={{ pageSize: 10 }}
+            />
+        );
+    };
+
+    // Update the items array to use the new table component
+    const items = [
+        {
+            key: '1',
+            label: (
+                <span>
+                    <ClockCircleOutlined /> Waiting for Approval
+                </span>
+            ),
+            children: (
+                <div className="mt-4">
+                    <RequestTable 
+                        data={filteredReservations.filter(r => r.active === "1")}
+                        onView={fetchReservationDetails}
+                    />
+                </div>
+            ),
+        },
+        {
+            key: '2',
+            label: (
+                <span>
+                    <CheckCircleOutlined /> Final Confirmation
+                </span>
+            ),
+            children: (
+                <div className="mt-4">
+                    <RequestTable 
+                        data={filteredReservations.filter(r => r.active === "0")}
+                        onView={fetchReservationDetails}
+                    />
+                </div>
+            ),
+        },
+        {
+            key: '3',
+            label: (
+                <span>
+                    <HistoryOutlined /> History
+                </span>
+            ),
+            children: (
+                <div className="mt-4">
+                    <RequestTable 
+                        data={filteredReservations}
+                        onView={fetchReservationDetails}
+                    />
+                </div>
+            ),
+        },
+    ];
+
+    // Modify the tab content rendering
+    const renderRequests = (requests, status) => {
+        if (loading) {
+            return (
+                <div className="flex justify-center items-center h-64">
+                    <Spinner animation="border" role="status" className="text-blue-500">
+                        <span className="sr-only">Loading...</span>
+                    </Spinner>
+                </div>
+            );
+        }
+
+        if (!requests.length) {
+            return (
+                <motion.p 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="text-gray-600 text-center py-12"
+                >
+                    No requests found.
+                </motion.p>
+            );
+        }
+
+        return (
+            <>
+                <ViewToggle />
+                <AnimatePresence>
+                    {viewMode === 'grid' ? (
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ delay: 0.4, duration: 0.5 }}
+                            className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
+                        >
+                            {/* Existing grid view code */}
+                            {requests.map((reservation, index) => (
+                                // Your existing grid card component
+                                <motion.div 
+                                    key={reservation.reservation_id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    transition={{ delay: index * 0.1, duration: 0.5 }}
+                                    className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 transition-all duration-300 hover:shadow-xl hover:scale-105"
+                                >
+                                    <div className="p-6">
+                                        <div className="flex flex-col gap-4">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h3 className="text-2xl font-semibold text-gray-800">
+                                                        {reservation.reservation_type === "Vehicle Form" 
+                                                            ? reservation.reservation_destination 
+                                                            : reservation.reservation_title}
+                                                    </h3>
+                                                    {getIconForType(reservation.type)}
+                                                </div>
+                                            </div>
+                                            {/* Request Details */}
+                                            <div className="space-y-2 text-sm">
+                                                <p className="text-gray-600">
+                                                    <span className="font-medium text-gray-700">Created:</span> {' '}
+                                                    {new Date(reservation.reservation_created_at).toLocaleString()}
+                                                </p>
+                                               
+                                                <p className="text-gray-600">
+                                                    <span className="font-medium text-gray-700">Reservation Status:</span> {' '}
+                                                    <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                                        {reservation.active === "1" ? "Waiting Approval" : reservation.reservation_status}
+                                                    </span>
+                                                </p>
+                                            </div>
+
+                                            {/* View Details Button */}
+                                            <button
+                                                className="w-full mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                                                onClick={() => {
+                                                    // Fix: Pass the reservation_id directly
+                                                    fetchReservationDetails(reservation.reservation_id);
+                                                }}
+                                            >
+                                                View Details
+                                            </button>
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="space-y-4"
+                        >
+                            {requests.map((reservation) => (
+                                <ListViewItem 
+                                    key={reservation.reservation_id}
+                                    reservation={reservation}
+                                    onClick={() => fetchReservationDetails(reservation.reservation_id)}
+                                />
+                            ))}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </>
+        );
+    };
+
+    // Update the tab items to use the new rendering function
+    
+
     // Replace the existing card rendering code in the return statement
     return (
         <div className="flex flex-col lg:flex-row bg-gradient-to-br from-white to-green-100">
@@ -278,133 +621,11 @@ const ReservationRequests = () => {
                     Reservation Requests
                 </motion.h2>
 
-                <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2, duration: 0.5 }}
-                    className="mb-8 flex flex-wrap items-center gap-4"
-                >
-                    <div className="flex items-center bg-white rounded-lg shadow-sm p-2">
-                        <FaFilter className="text-gray-400 mr-2" />
-                        <select
-                            value={filter}
-                            onChange={e => setFilter(e.target.value)}
-                            className="bg-transparent border-none focus:outline-none text-gray-700"
-                        >
-                            <option value="All">All Types</option>
-                            <option value="Vehicle">Vehicle</option>
-                            <option value="Venue">Venue</option>
-                            <option value="Equipment">Equipment</option>
-                        </select>
-                    </div>
-                    <div className="flex items-center bg-white rounded-lg shadow-sm p-2">
-                        <FaSearch className="text-gray-400 mr-2" />
-                        <input
-                            type="text"
-                            placeholder="Search by ID or User"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="bg-transparent border-none focus:outline-none text-gray-700"
-                        />
-                    </div>
-                    <div className="flex items-center bg-white rounded-lg shadow-sm p-2">
-                        <FaCalendarAlt className="text-gray-400 mr-2" />
-                        <DatePicker
-                            selectsRange={true}
-                            startDate={startDate}
-                            endDate={endDate}
-                            onChange={(update) => {
-                                setDateRange(update);
-                            }}
-                            placeholderText="Filter by date range"
-                            className="bg-transparent border-none focus:outline-none text-gray-700"
-                        />
-                    </div>
-                </motion.div>
-
-                {loading ? (
-                    <div className="flex justify-center items-center h-64">
-                        <Spinner animation="border" role="status" className="text-blue-500">
-                            <span className="sr-only">Loading...</span>
-                        </Spinner>
-                    </div>
-                ) : (
-                    <AnimatePresence>
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ delay: 0.4, duration: 0.5 }}
-                            className="grid gap-8 md:grid-cols-2 lg:grid-cols-3"
-                        >
-                            {filteredReservations.length > 0 ? (
-                                filteredReservations.map((reservation, index) => (
-                                    <motion.div 
-                                        key={reservation.reservation_id}
-                                        initial={{ opacity: 0, y: 20 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -20 }}
-                                        transition={{ delay: index * 0.1, duration: 0.5 }}
-                                        className="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-200 transition-all duration-300 hover:shadow-xl hover:scale-105"
-                                    >
-                                        <div className="p-6">
-                                            <div className="flex flex-col gap-4">
-                                                {/* Status Badge */}
-                                                
-                                                {/* Request ID, Form Name, and Type */}
-                                                <div>
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <h3 className="text-2xl font-semibold text-gray-800">{reservation.venue_form_name || reservation.vehicle_form_name || 'Unnamed Form'}</h3>
-                                                        {getIconForType(reservation.type)}
-                                                    </div>
-                                                    
-                                                </div>
-
-                                                {/* Request Details */}
-                                                <div className="space-y-2 text-sm">
-                                                    <p className="text-gray-600">
-                                                        <span className="font-medium text-gray-700">Created:</span> {' '}
-                                                        {new Date(reservation.approval_created_at).toLocaleString()}
-                                                    </p>
-                                                    <p className="text-gray-600">
-                                                        <span className="font-medium text-gray-700">Request Type:</span> {' '}
-                                                        {reservation.venue_form_name ? 'Venue' : 'Vehicle'}
-                                                    </p>
-                                                    <p className="text-gray-600">
-                                                        <span className="font-medium text-gray-700">Reservation Status:</span> {' '}
-                                                        <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800">
-                                                            {reservation.reservation_status}
-                                                        </span>
-                                                    </p>
-                                                </div>
-
-                                                {/* View Details Button */}
-                                                <button
-                                                    className="w-full mt-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                                                    onClick={() => {
-                                                        // Fix: Pass the reservation_id directly
-                                                        fetchReservationDetails(reservation.reservation_id);
-                                                    }}
-                                                >
-                                                    View Details
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </motion.div>
-                                ))
-                            ) : (
-                                <motion.p 
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    exit={{ opacity: 0 }}
-                                    className="text-gray-600 col-span-full text-center py-12"
-                                >
-                                    No requests found.
-                                </motion.p>
-                            )}
-                        </motion.div>
-                    </AnimatePresence>
-                )}
+                <Tabs 
+                    activeKey={activeTab} 
+                    onChange={handleTabChange}
+                    items={items}
+                />
 
                 {/* Detail Modal for Accepting */}
                 <DetailModal 
@@ -476,76 +697,86 @@ const formatDateRange = (startDate, endDate) => {
 const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline, isAccepting, isDeclining }) => {
     if (!reservationDetails) return null;
 
-    // Determine the request type based on the response data
-    const isVenueRequest = reservationDetails.venue && reservationDetails.venue.form_name;
-    const isVehicleRequest = reservationDetails.vehicle && reservationDetails.vehicle.form_name;
+    const getModalFooter = () => {
+        // Show accept/decline buttons only for requests in Final Confirmation (active === "0")
+        if (reservationDetails.active === "0") {
+            return [
+                <Button key="decline" danger loading={isDeclining} onClick={onDecline}>
+                    Decline
+                </Button>,
+                <Button key="accept" type="primary" loading={isAccepting} onClick={onAccept}>
+                    Accept
+                </Button>,
+                <Button key="close" onClick={onClose}>
+                    Close
+                </Button>
+            ];
+        }
+        return [
+            <Button key="close" onClick={onClose}>
+                Close
+            </Button>
+        ];
+    };
+
+    const commonHeaderDetails = (
+        <>
+            <Descriptions.Item label="Requester" span={2}>
+                <Space>
+                    <UserOutlined />
+                    {reservationDetails.requester_name}
+                </Space>
+            </Descriptions.Item>
+            <Descriptions.Item label="Department" span={2}>
+                <Tag color="blue">{reservationDetails.department_name}</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Request Date" span={2}>
+                {new Date(reservationDetails.reservation_created_at).toLocaleString()}
+            </Descriptions.Item>
+        </>
+    );
 
     return (
         <Modal
+            title={`Request Details - ${reservationDetails.active === "0" ? "Final Confirmation" : "Waiting for Approval"}`}
             visible={visible}
             onCancel={onClose}
             width={800}
-            footer={[
-                <Button key="close" onClick={onClose}>
-                    Close
-                </Button>,
-                <Button 
-                    key="decline" 
-                    danger 
-                    loading={isDeclining}
-                    onClick={onDecline}
-                >
-                    Decline
-                </Button>,
-                <Button 
-                    key="accept" 
-                    type="primary" 
-                    loading={isAccepting}
-                    onClick={onAccept}
-                    style={{ backgroundColor: '#52c41a' }}
-                >
-                    Reserve
-                </Button>,
-            ]}
+            footer={getModalFooter()}
         >
-            {isVenueRequest ? (
-                // Venue request content
+            {reservationDetails.request_type && reservationDetails.request_type.toLowerCase() === 'venue' ? (
                 <Descriptions bordered column={2}>
-                    <Descriptions.Item 
-                        label="Venue Name" 
-                        span={2}
-                    >
-                        {reservationDetails.venue.venue_name}
+                    {commonHeaderDetails}
+                    <Descriptions.Item label="Venue Name" span={2}>
+                        {reservationDetails.venue?.venue_name}
                     </Descriptions.Item>
                     <Descriptions.Item label="Event Title" span={2}>
-                        {reservationDetails.venue.venue_form_event_title}
+                        {reservationDetails.reservation_title}
                     </Descriptions.Item>
                     <Descriptions.Item label="Description" span={2}>
-                        {reservationDetails.venue.venue_form_description}
+                        {reservationDetails.reservation_description}
                     </Descriptions.Item>
                     <Descriptions.Item label="Participants">
                         <Space>
                             <TeamOutlined />
-                            {reservationDetails.venue.venue_participants}
+                            {reservationDetails.reservation_participants}
                         </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="Schedule" span={2}>
                         <Space direction="vertical">
                             <CalendarOutlined />
                             {formatDateRange(
-                                reservationDetails.venue?.venue_form_start_date,
-                                reservationDetails.venue?.venue_form_end_date
+                                reservationDetails.reservation_start_date,
+                                reservationDetails.reservation_end_date
                             )}
                         </Space>
                     </Descriptions.Item>
-
-                    {/* Equipment section */}
                     <Descriptions.Item label="Equipment Requested" span={2}>
-                        {!reservationDetails.equipment || reservationDetails.equipment.length === 0 ? (
+                        {!reservationDetails.equipment || !reservationDetails.equipment.length ? (
                             <Tag color="default">No Equipment Added</Tag>
                         ) : (
                             <div className="space-y-2">
-                                {Array.isArray(reservationDetails.equipment) ? (
+                                {Array.isArray(reservationDetails.equipment) && 
                                     reservationDetails.equipment.map((item, index) => (
                                         <div key={index} className="flex items-center gap-2">
                                             <span>{item.equipment_name}</span>
@@ -554,57 +785,55 @@ const DetailModal = ({ visible, onClose, reservationDetails, onAccept, onDecline
                                             </Tag>
                                         </div>
                                     ))
-                                ) : (
-                                    <Tag color="default">Invalid Equipment Data</Tag>
-                                )}
+                                }
                             </div>
                         )}
                     </Descriptions.Item>
                 </Descriptions>
-            ) : isVehicleRequest ? (
+            ) : reservationDetails.request_type && reservationDetails.request_type.toLowerCase() === 'vehicle' ? (
                 <Descriptions bordered column={2}>
-                    <Descriptions.Item 
-                        label="Vehicle Details" 
-                        span={2}
-                    >
-                        <Tag color="blue">{reservationDetails.vehicle.license}</Tag>
-                        <Tag color="green">{reservationDetails.vehicle.model} {reservationDetails.vehicle.make}</Tag>
-                    </Descriptions.Item>
-                    <Descriptions.Item label="Category" span={2}>
-                        <Tag color="blue">{reservationDetails.vehicle.category}</Tag>
+                    {commonHeaderDetails}
+                    <Descriptions.Item label="Vehicle" span={2}>
+                        <Tag color="blue">{reservationDetails.vehicle?.vehicle_model_name || 'N/A'}</Tag>
                     </Descriptions.Item>
                     <Descriptions.Item label="Purpose" span={2}>
-                        {reservationDetails.vehicle.vehicle_form_purpose}
+                        {reservationDetails.reservation_purpose}
                     </Descriptions.Item>
                     <Descriptions.Item label="Destination" span={2}>
                         <Space>
                             <EnvironmentOutlined />
-                            {reservationDetails.vehicle.vehicle_form_destination}
+                            {reservationDetails.reservation_destination}
                         </Space>
                     </Descriptions.Item>
                     <Descriptions.Item label="Schedule" span={2}>
                         <Space direction="vertical">
                             <CalendarOutlined />
                             {formatDateRange(
-                                reservationDetails.vehicle.vehicle_form_start_date,
-                                reservationDetails.vehicle.vehicle_form_end_date
+                                reservationDetails.reservation_start_date,
+                                reservationDetails.reservation_end_date
                             )}
                         </Space>
                     </Descriptions.Item>
-                    <Descriptions.Item label="Assigned Driver" span={2}>
+                    <Descriptions.Item label="Driver" span={2}>
                         <Space>
                             <UserOutlined />
-                            {Array.isArray(reservationDetails.vehicle.drivers) && reservationDetails.vehicle.drivers.length > 0
-                                ? reservationDetails.vehicle.drivers[0]
-                                : 'No driver assigned'}
+                            {reservationDetails.driver?.driver_name || 'No driver assigned'}
                         </Space>
                     </Descriptions.Item>
+                    {reservationDetails.passengers && (
+                        <Descriptions.Item label="Passengers" span={2}>
+                            <Space>
+                                <TeamOutlined />
+                                {reservationDetails.passengers.passenger_name}
+                            </Space>
+                        </Descriptions.Item>
+                    )}
                 </Descriptions>
             ) : (
                 <Alert
-                    message="Unknown Request Type"
-                    description="Could not determine the type of request."
-                    type="warning"
+                    message="Request Type Information"
+                    description={`Request Type: ${reservationDetails.request_type || 'Not specified'}`}
+                    type="info"
                 />
             )}
         </Modal>

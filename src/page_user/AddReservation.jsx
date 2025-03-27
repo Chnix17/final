@@ -129,7 +129,7 @@ const AddReservation = () => {
     eventTitle: '',
     description: '',
     participants: '',
-    venue: '',
+    venue: [], // Change to array for multiple venues
     // Vehicle specific fields
     purpose: '',
     destination: '',
@@ -300,36 +300,53 @@ const fetchEquipment = async () => {
   if (!formData.startDate || !formData.endDate) return;
 
   try {
+    // Convert dates to required format
+    const startDateTime = format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss');
+    const endDateTime = format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss');
+
+    // Log the request payload for debugging
+    console.log('Equipment fetch payload:', {
+      operation: 'fetchEquipments',
+      startDateTime,
+      endDateTime
+    });
+
     const response = await axios({
       method: 'post',
       url: 'http://localhost/coc/gsd/fetch2.php',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      data: {
+      data: JSON.stringify({
         operation: 'fetchEquipments',
-        startDateTime: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
-        endDateTime: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss')
-      }
+        startDateTime: startDateTime,
+        endDateTime: endDateTime
+      })
     });
 
-    if (response.data.status === 'success') {
+    // Log the response for debugging
+    console.log('Equipment fetch response:', response.data);
+
+    if (response.data && response.data.status === 'success' && Array.isArray(response.data.data)) {
       const formattedEquipment = response.data.data.map(item => ({
         equipment_id: item.equip_id,
         equipment_name: item.equip_name,
-        equipment_quantity: parseInt(item.equip_quantity),
-        equipment_category: item.equipments_category_name,
+        equipment_quantity: parseInt(item.equip_quantity) || 0,
+        equipment_category: item.equipments_category_name || 'Uncategorized',
         equipment_pic: item.equip_pic,
-        status_availability_name: item.status_availability_name,
+        status_availability_name: item.status_availability_name || 'unavailable',
         reserved_quantity: parseInt(item.reserved_quantity || 0),
-        available_quantity: parseInt(item.equip_quantity) - parseInt(item.reserved_quantity || 0)
+        available_quantity: parseInt(item.equip_quantity || 0) - parseInt(item.reserved_quantity || 0)
       }));
+      
       setEquipment(formattedEquipment);
     } else {
-      toast.error("Error fetching equipment: " + response.data.message);
+      throw new Error('Invalid response format from server');
     }
   } catch (error) {
     console.error("Error fetching equipment:", error);
+    console.error("Response data:", error.response?.data);
     toast.error("An error occurred while fetching equipment.");
   }
 };
@@ -418,8 +435,8 @@ const validateCurrentStep = () => {
       return true;
 
     case 1:
-      if (formData.resourceType === 'venue' && !formData.venue) {
-        toast.error('Please select a venue');
+      if (formData.resourceType === 'venue' && formData.venue.length === 0) {
+        toast.error('Please select at least one venue');
         return false;
       }
       if (formData.resourceType === 'vehicle' && (!selectedModels || selectedModels.length === 0)) {
@@ -576,9 +593,9 @@ const renderVenues = () => (
     {/* Compact header */}
     <div className="flex justify-between items-center px-2 mb-2">
       <h3 className="font-medium text-sm sm:text-base truncate flex-1">
-        {formData.venue 
-          ? venues.find(v => v.ven_id === formData.venue)?.ven_name
-          : 'Select Venue'}
+        {formData.venue.length > 0 
+          ? `Selected Venues (${formData.venue.length})`
+          : 'Select Venues'}
       </h3>
       <div className="flex space-x-1 bg-gray-100 p-0.5 rounded-md ml-2">
         <button
@@ -617,13 +634,15 @@ const renderVenues = () => (
           className={`
             cursor-pointer
             ${viewMode === 'list' ? 'flex' : ''}
-            ${formData.venue === venue.ven_id ? 'ring-1 ring-green-500' : ''}
+            ${formData.venue.includes(venue.ven_id) ? 'ring-1 ring-green-500' : ''}
             p-1.5 hover:shadow-md transition-shadow
           `}
           onClick={() => {
             setFormData(prev => ({
               ...prev,
-              venue: venue.ven_id
+              venue: prev.venue.includes(venue.ven_id)
+                ? prev.venue.filter(id => id !== venue.ven_id)
+                : [...prev.venue, venue.ven_id]
             }));
           }}
         >
@@ -1137,46 +1156,37 @@ const renderResourceTypeSelection = () => (
 
 const handleAddReservation = async () => {
   try {
-    setLoading(true); // Start loading
+    setLoading(true);
 
     const userId = localStorage.getItem('user_id');
-    const deptId = localStorage.getItem('department_id');
-    const storedName = localStorage.getItem('name');
     
-    if (!userId || !deptId || !storedName) {
+    if (!userId) {
       toast.error('User session invalid. Please log in again.');
       return false;
     }
 
-    // Simulate a 5-second delay
-    await new Promise((resolve) => setTimeout(resolve, 5000));
-
-    // Validate required fields based on resource type
     if (formData.resourceType === 'venue') {
-      if (!formData.venue || !formData.eventTitle || !formData.description || 
+      if (formData.venue.length === 0 || !formData.eventTitle || !formData.description || 
           !formData.startDate || !formData.endDate) {
         toast.error('Please fill in all required venue reservation fields');
         return false;
       }
 
-      // Create the venue reservation payload
+      // Format the payload according to API requirements
       const venuePayload = {
         operation: 'venuereservation',
-        user_id: parseInt(userId),
-        user_type: 'user',
-        dept_id: parseInt(deptId),
-        venue_id: parseInt(formData.venue),
         form_data: {
-          name: storedName,
-          event_title: formData.eventTitle.trim(),
+          title: formData.eventTitle.trim(),
           description: formData.description.trim(),
           participants: formData.participants ? formData.participants.toString() : "0",
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
+          user_id: parseInt(userId),
+          venues: formData.venue.map(id => parseInt(id)), // Convert venue IDs to array
           equipment: Object.entries(selectedVenueEquipment).map(([equipId, quantity]) => ({
             equipment_id: parseInt(equipId),
             quantity: parseInt(quantity)
-          })).filter(item => item.quantity > 0)
+          }))
         }
       };
 
@@ -1184,72 +1194,55 @@ const handleAddReservation = async () => {
         'http://localhost/coc/gsd/insert_reservation.php',
         venuePayload,
         {
-          headers: {
-            'Content-Type': 'application/json'
-          }
+          headers: { 'Content-Type': 'application/json' }
         }
       );
 
       if (response.data.status === 'success') {
         toast.success('Venue reservation submitted successfully!');
-        setCurrentStep(5); // Move to success state
+        setCurrentStep(5);
         return true;
       } else {
         throw new Error(response.data.message || 'Failed to submit venue reservation');
       }
-    } else {
-      // Vehicle reservation validation
-      if (!selectedModels || selectedModels.length === 0) {
-        toast.error('Please select at least one vehicle');
+    } else { // Vehicle reservation
+      if (!selectedModels || selectedModels.length === 0 || !formData.driverName) {
+        toast.error('Please select vehicle(s) and driver');
         return false;
       }
-      if (!formData.purpose || !formData.destination || 
-          !formData.startDate || !formData.endDate || 
-          !formData.passengers || formData.passengers.length === 0) {
+      if (!formData.purpose || !formData.destination || !formData.startDate || !formData.endDate) {
         toast.error('Please fill in all required vehicle reservation fields');
         return false;
       }
 
       const vehiclePayload = {
         operation: 'vehiclereservation',
-        user_id: parseInt(userId),
-        user_type: 'user',
-        dept_id: parseInt(deptId),
-        vehicles: selectedModels.map(id => parseInt(id)),  // Convert to integers
         form_data: {
-          name: storedName,
-          purpose: formData.purpose.trim(), 
           destination: formData.destination.trim(),
+          purpose: formData.purpose.trim(),
           start_date: format(new Date(formData.startDate), 'yyyy-MM-dd HH:mm:ss'),
           end_date: format(new Date(formData.endDate), 'yyyy-MM-dd HH:mm:ss'),
-          driver_id: parseInt(formData.driverName),  // Convert to integer
-          passengers: formData.passengers.map(p => p.name.trim())
+          user_id: userId,
+          vehicles: selectedModels.map(id => parseInt(id)),
+          passengers: formData.passengers.map(p => p.name.trim()),
+          driver_id: formData.driverName
         }
       };
 
-      try {
-        const response = await axios.post(
-          'http://localhost/coc/gsd/insert_reservation.php',
-          vehiclePayload,
-          {
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        console.log('Vehicle reservation response:', response.data); // Debug log
-
-        if (response.data.status === 'success') {
-          toast.success('Vehicle reservation submitted successfully!');
-          setCurrentStep(5);
-          return true;
-        } else {
-          throw new Error(response.data.message || 'Failed to submit vehicle reservation');
+      const response = await axios.post(
+        'http://localhost/coc/gsd/insert_reservation.php',
+        vehiclePayload,
+        {
+          headers: { 'Content-Type': 'application/json' }
         }
-      } catch (error) {
-        console.error('Vehicle reservation error:', error);
-        throw error;
+      );
+
+      if (response.data.status === 'success') {
+        toast.success('Vehicle reservation submitted successfully!');
+        setCurrentStep(5);
+        return true;
+      } else {
+        throw new Error(response.data.message || 'Failed to submit vehicle reservation');
       }
     }
   } catch (error) {
@@ -1257,7 +1250,7 @@ const handleAddReservation = async () => {
     toast.error(error.message || 'An error occurred while submitting the reservation');
     return false;
   } finally {
-    setLoading(false); // Stop loading
+    setLoading(false);
   }
 };
 
@@ -1309,7 +1302,7 @@ const resetForm = () => {
     eventTitle: '',
     description: '',
     participants: '',
-    venue: '',
+    venue: [],
     purpose: '',
     destination: '',
     passengers: [], // Reset passengers to empty array
@@ -1332,7 +1325,7 @@ const resetForm = () => {
 
 
 const renderReviewSection = () => {
-  const selectedVenue = venues.find(v => v.ven_id.toString() === formData.venue.toString());
+  const selectedVenues = venues.filter(v => formData.venue.includes(v.ven_id));
   const selectedVehicleDetails = vehicles.filter(v => selectedModels.includes(v.vehicle_id));
   const storedName = localStorage.getItem('name');
   const selectedDriver = drivers.find(d => d.driver_id.toString() === formData.driverName?.toString());
@@ -1367,22 +1360,26 @@ const renderReviewSection = () => {
             // Venue Details - Minimized for mobile
             <div className="space-y-4">
               <h4 className={`${isMobile ? 'text-sm' : 'text-lg'} font-medium text-gray-700`}>
-                Venue Details
+                Selected Venues ({selectedVenues.length})
               </h4>
               <div className="bg-gray-50 rounded-lg p-3">
-                {selectedVenue && (
-                  <div className="space-y-3">
-                    <img
-                      src={selectedVenue.image_url || '/default-venue.jpg'}
-                      alt={selectedVenue.ven_name}
-                      className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
-                    />
-                    <div className={isMobile ? 'text-sm' : ''}>
-                      <h5 className="font-medium">{selectedVenue.ven_name}</h5>
-                      <p className="text-xs text-gray-600">Capacity: {selectedVenue.ven_occupancy}</p>
+                <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4`}>
+                  {selectedVenues.map(venue => (
+                    <div key={venue.ven_id} className="bg-white rounded-lg p-3">
+                      <div className="space-y-3">
+                        <img
+                          src={venue.image_url || '/default-venue.jpg'}
+                          alt={venue.ven_name}
+                          className={`w-full ${isMobile ? 'h-32' : 'h-48'} object-cover rounded-lg`}
+                        />
+                        <div className={isMobile ? 'text-sm' : ''}>
+                          <h5 className="font-medium">{venue.ven_name}</h5>
+                          <p className="text-xs text-gray-600">Capacity: {venue.ven_occupancy}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  ))}
+                </div>
 
                 <div className={`grid ${isMobile ? 'grid-cols-1 gap-2' : 'grid-cols-2 gap-4'} mt-3`}>
                   <div>
@@ -2142,8 +2139,9 @@ const fetchDrivers = async (startDate, endDate) => {
 
     if (response.data.status === 'success') {
       const driversData = response.data.data.map(driver => ({
-        ...driver,
-        displayName: `${driver.driver_full_name} (${driver.departments_name || 'Department Driver'})`
+        driver_id: driver.users_id,
+        driver_full_name: `${driver.users_fname} ${driver.users_mname} ${driver.users_lname}`,
+        departments_name: driver.departments_name
       }));
       setAvailableDrivers(driversData);
     } else {
@@ -2540,7 +2538,7 @@ const renderDriverDropdown = () => {
               disabled={availableDrivers.length === 0}
               showSearch
               filterOption={(input, option) =>
-                option.children?.toString().toLowerCase().indexOf(input.toLowerCase()) >= 0
+                (option?.title ?? '').toLowerCase().includes(input.toLowerCase())
               }
               notFoundContent={
                 <Empty
@@ -2553,13 +2551,16 @@ const renderDriverDropdown = () => {
                 <Select.Option 
                   key={driver.driver_id} 
                   value={driver.driver_id}
+                  title={driver.driver_full_name}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <UserOutlined className="text-gray-400" />
                       <span>{driver.driver_full_name}</span>
                     </div>
-                    
+                    <span className="text-xs text-gray-500">
+                      {driver.departments_name}
+                    </span>
                   </div>
                 </Select.Option>
               ))}
@@ -2576,7 +2577,7 @@ const renderDriverDropdown = () => {
                       {availableDrivers.find(d => d.driver_id === formData.driverName)?.driver_full_name}
                     </div>
                     <div className="text-sm text-blue-600">
-                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.departments_name || 'Driver'}
+                      {availableDrivers.find(d => d.driver_id === formData.driverName)?.departments_name}
                     </div>
                   </div>
                 </div>

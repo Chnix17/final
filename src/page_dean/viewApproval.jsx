@@ -102,13 +102,13 @@ const ViewApproval = () => {
 
   const filteredRequests = requests.filter(request => {
     const matchesSearch = (
-      (request.vehicle?.form_name || request.venue?.form_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (request.vehicle?.purpose || request.venue?.event_title || '').toLowerCase().includes(searchQuery.toLowerCase())
+      (request.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (request.purpose || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
     
     const matchesType = requestType === 'all' || 
-      (requestType === 'vehicle' && request.vehicle?.license) ||
-      (requestType === 'venue' && request.venue?.name);
+      (requestType === 'vehicle' && request.vehicle?.id) ||
+      (requestType === 'venue' && request.venue?.id);
 
     const matchesStatus = filterStatus === 'all' || request.status === filterStatus;
 
@@ -197,11 +197,8 @@ const ViewApproval = () => {
   };
 
   const VenueRequestModal = ({ request, visible, onClose, onApprove, onDecline, availabilityData }) => {
-    const getAvailabilityStatus = (type, id) => {
-      if (!availabilityData) return true;
-      return !availabilityData.unavailable_venues?.some(v => v.ven_id === id);
-    };
-  
+    if (!request?.venue) return null;
+
     return (
       <Modal
         visible={visible}
@@ -212,8 +209,6 @@ const ViewApproval = () => {
             <span className="text-xl font-semibold">Venue Request Details</span>
             <Space>
               <Tag color="blue">{request.venue.name}</Tag>
-              <Badge status={request.status === 'pending' ? 'processing' : request.status === 'approved' ? 'success' : 'error'} 
-                    text={request.status?.toUpperCase()} />
             </Space>
           </div>
         }
@@ -223,69 +218,22 @@ const ViewApproval = () => {
         ]}
       >
         <div className="space-y-6">
-          {/* Request Overview Card */}
           <Card title="Event Information" className="shadow-sm">
             <Descriptions bordered column={2}>
-              <Descriptions.Item label="Event Title" span={2}>{request.venue.event_title}</Descriptions.Item>
-              <Descriptions.Item label="Requester">{request.venue.requester}</Descriptions.Item>
-              <Descriptions.Item label="Participants">{request.venue.participants}</Descriptions.Item>
-              <Descriptions.Item label="Start Date" span={1}>
-                {new Date(request.venue.start_date).toLocaleString()}
-              </Descriptions.Item>
-              <Descriptions.Item label="End Date" span={1}>
-                {new Date(request.venue.end_date).toLocaleString()}
-              </Descriptions.Item>
+              <Descriptions.Item label="Event Title" span={2}>{request.venue.title}</Descriptions.Item>
+              <Descriptions.Item label="Requester">{request.requester}</Descriptions.Item>
+              <Descriptions.Item label="Department">{request.department_name}</Descriptions.Item>
+              <Descriptions.Item label="Description" span={2}>{request.venue.description}</Descriptions.Item>
             </Descriptions>
           </Card>
-  
-          {/* Venue Details Card */}
-          <Card title="Venue Details" className="shadow-sm">
-            <Descriptions bordered>
-              <Descriptions.Item label="Venue Name" span={2}>{request.venue.name}</Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={getAvailabilityStatus('venue', request.venue.ven_id) ? 'success' : 'error'}>
-                  {getAvailabilityStatus('venue', request.venue.ven_id) ? 'Available' : 'Unavailable'}
-                </Tag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Description" span={3}>{request.venue.description}</Descriptions.Item>
-            </Descriptions>
-          </Card>
-  
-          {/* Equipment Section if any */}
-          {request.equipment && request.equipment.equipment_ids.length > 0 && (
-            <Card title="Equipment Requested" className="shadow-sm">
-              <Table
-                dataSource={request.equipment.equipment_ids.map((id, index) => ({
-                  key: id,
-                  name: request.equipment.name[index],
-                  quantity: request.equipment.quantity[index]
-                }))}
-                columns={[
-                  { title: 'Equipment', dataIndex: 'name' },
-                  { title: 'Quantity', dataIndex: 'quantity' }
-                ]}
-                pagination={false}
-              />
-            </Card>
-          )}
         </div>
       </Modal>
     );
   };
-  
+
   const VehicleRequestModal = ({ request, visible, onClose, onApprove, onDecline, availabilityData }) => {
-    const getAvailabilityStatus = (type, id) => {
-      if (!availabilityData) return true;
-      switch (type) {
-        case 'vehicle':
-          return !availabilityData.unavailable_vehicles?.some(v => v.vehicle_id === id);
-        case 'driver':
-          return !availabilityData.unavailable_drivers?.some(d => d.driver_id === id);
-        default:
-          return true;
-      }
-    };
-  
+    if (!request?.vehicle) return null;
+
     return (
       <Modal
         visible={visible}
@@ -296,8 +244,6 @@ const ViewApproval = () => {
             <span className="text-xl font-semibold">Vehicle Request Details</span>
             <Space>
               <Tag color="purple">{request.vehicle.license}</Tag>
-              <Badge status={request.status === 'pending' ? 'processing' : request.status === 'approved' ? 'success' : 'error'} 
-                    text={request.status?.toUpperCase()} />
             </Space>
           </div>
         }
@@ -307,62 +253,40 @@ const ViewApproval = () => {
         ]}
       >
         <div className="space-y-6">
-          {/* Trip Information Card */}
           <Card title="Trip Information" className="shadow-sm">
             <Descriptions bordered column={2}>
               <Descriptions.Item label="Purpose" span={2}>{request.vehicle.purpose}</Descriptions.Item>
-              <Descriptions.Item label="Requester">{request.vehicle.requester}</Descriptions.Item>
+              <Descriptions.Item label="Requester">{request.requester}</Descriptions.Item>
+              <Descriptions.Item label="Department">{request.department_name}</Descriptions.Item>
               <Descriptions.Item label="Destination">{request.vehicle.destination}</Descriptions.Item>
-              <Descriptions.Item label="Start Date">
-                {new Date(request.vehicle.start_date).toLocaleString()}
-              </Descriptions.Item>
-              <Descriptions.Item label="End Date">
-                {new Date(request.vehicle.end_date).toLocaleString()}
-              </Descriptions.Item>
             </Descriptions>
           </Card>
-  
-          {/* Vehicle Details Card */}
+
           <Card title="Vehicle Details" className="shadow-sm">
             <Descriptions bordered>
-              <Descriptions.Item label="License Plate" span={2}>{request.vehicle.license}</Descriptions.Item>
-              <Descriptions.Item label="Status">
-                <Tag color={getAvailabilityStatus('vehicle', request.vehicle.vehicle_id) ? 'success' : 'error'}>
-                  {getAvailabilityStatus('vehicle', request.vehicle.vehicle_id) ? 'Available' : 'Unavailable'}
-                </Tag>
-              </Descriptions.Item>
+              <Descriptions.Item label="License Plate">{request.vehicle.license}</Descriptions.Item>
               <Descriptions.Item label="Make">{request.vehicle.make}</Descriptions.Item>
               <Descriptions.Item label="Model">{request.vehicle.model}</Descriptions.Item>
               <Descriptions.Item label="Category">{request.vehicle.category}</Descriptions.Item>
             </Descriptions>
           </Card>
-  
-          {/* Drivers Section */}
-          {request.vehicle.driver_ids.length > 0 && (
+
+          {request.vehicle.drivers && (
             <Card title="Assigned Drivers" className="shadow-sm">
               <List
-                dataSource={request.vehicle.driver_ids.map((id, index) => ({
-                  id,
-                  name: request.vehicle.driver_names[index]
-                }))}
-                renderItem={item => (
+                dataSource={request.vehicle.drivers}
+                renderItem={driver => (
                   <List.Item>
                     <List.Item.Meta
                       avatar={<Avatar icon={<FiUser />} />}
-                      title={item.name}
-                      description={
-                        <Tag color={getAvailabilityStatus('driver', item.id) ? 'success' : 'error'}>
-                          {getAvailabilityStatus('driver', item.id) ? 'Available' : 'Unavailable'}
-                        </Tag>
-                      }
+                      title={driver}
                     />
                   </List.Item>
                 )}
               />
             </Card>
           )}
-  
-          {/* Passengers List if any */}
+
           {request.passengers && request.passengers.length > 0 && (
             <Card title="Passengers" className="shadow-sm">
               <List
@@ -371,7 +295,7 @@ const ViewApproval = () => {
                   <List.Item>
                     <List.Item.Meta
                       avatar={<Avatar icon={<FiUser />} />}
-                      title={passenger.name}
+                      title={passenger.passenger_name}
                     />
                   </List.Item>
                 )}
@@ -480,31 +404,31 @@ const ViewApproval = () => {
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                               <h3 className="text-lg font-semibold text-gray-900">
-                                {request.vehicle?.form_name || request.venue?.form_name || 'Unnamed Request'}
+                                {request.venue?.title || request.vehicle?.purpose || 'Unnamed Request'}
                               </h3>
                               <div className="mt-2 flex items-center gap-4 text-sm text-gray-600">
                                 <span className="flex items-center">
+                                  <FiUser className="mr-2" />
+                                  {request.requester}
+                                </span>
+                                <span className="flex items-center">
                                   <FiCalendar className="mr-2" />
-                                  {new Date(request.approval_created_at).toLocaleDateString()}
+                                  {new Date(request.reservation_created_at).toLocaleDateString()}
                                 </span>
                                 <span className="flex items-center">
                                   <FiMapPin className="mr-2" />
                                   {request.vehicle?.destination || request.venue?.name || 'N/A'}
-                                </span>
-                                <span className="flex items-center">
-                                  <FiUser className="mr-2" />
-                                  {request.vehicle?.requester || request.venue?.requester || 'Unknown'}
                                 </span>
                               </div>
                             </div>
                             
                             <div className="flex items-center gap-4">
                               <span className={`px-3 py-1 rounded-full text-sm ${
-                                request.vehicle?.license ? 
+                                request.vehicle ? 
                                 'bg-blue-100 text-blue-800' : 
                                 'bg-green-100 text-green-800'
                               }`}>
-                                {request.vehicle?.license ? 'Vehicle' : 'Venue'}
+                                {request.vehicle ? 'Vehicle' : 'Venue'}
                               </span>
                               <button
                                 onClick={() => handleViewDetails(request)}
@@ -529,7 +453,7 @@ const ViewApproval = () => {
       {/* Enhanced Modal */}
       <AnimatePresence>
         {selectedRequest && (
-          selectedRequest.vehicle?.vehicle_id ? (
+          selectedRequest.vehicle ? (
             <VehicleRequestModal
               request={selectedRequest}
               visible={!!selectedRequest}
@@ -538,7 +462,7 @@ const ViewApproval = () => {
               onDecline={() => handleApproval(selectedRequest.reservation_id, false)}
               availabilityData={availabilityData}
             />
-          ) : selectedRequest.venue?.ven_id ? (
+          ) : selectedRequest.venue ? (
             <VenueRequestModal
               request={selectedRequest}
               visible={!!selectedRequest}

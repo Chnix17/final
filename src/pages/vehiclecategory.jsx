@@ -68,7 +68,14 @@ const VehicleCategories = () => {
 
   const confirmDelete = async () => {
     try {
-      const response = await axios.post('http://localhost/coc/gsd/delete_master.php', new URLSearchParams({ operation: 'deleteVehicleCategory', vehicle_category_id: selectedCategoryId }));
+      const response = await axios.post('http://localhost/coc/gsd/delete_master.php', {
+        operation: 'deleteVehicleCategory',
+        vehicleCategoryId: selectedCategoryId
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
       if (response.data.status === 'success') {
         setCategories(categories.filter(category => category.vehicle_category_id !== selectedCategoryId));
         setFilteredCategories(filteredCategories.filter(category => category.vehicle_category_id !== selectedCategoryId));

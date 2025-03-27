@@ -5,6 +5,8 @@ import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { FaEye, FaEyeSlash, FaLock, FaUser, FaCalculator, FaCalendarCheck, FaChartLine, FaClock } from 'react-icons/fa';
 import toast, { Toaster } from 'react-hot-toast';
 import { Modal } from 'antd';
+import { setSessionCookie, removeSessionCookie } from '../utils/cookieUtils';
+import { initializeSessionManager, updateLastActivity } from '../utils/sessionManager';
 
 function Logins() {
     const [username, setUsername] = useState("");
@@ -28,6 +30,7 @@ function Logins() {
     const [resetKey, setResetKey] = useState('');
     const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
     const [isSendingOtp, setIsSendingOtp] = useState(false);
+
     const [otpDigits, setOtpDigits] = useState(Array(8).fill(''));
     const [otpRefs] = useState(Array(8).fill(0).map(() => React.createRef()));
     const [showCaptchaAfterEmail, setShowCaptchaAfterEmail] = useState(false);
@@ -153,6 +156,12 @@ function Logins() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [showOtpInput, resendTimer, showLoginOTP, loginResendTimer, lastTimerUpdate]);
+
+    useEffect(() => {
+        // Initialize session timeout handling
+        const cleanup = initializeSessionManager(navigateTo);
+        return () => cleanup();
+    }, [navigateTo]);
 
     const generateCaptcha = () => {
         const canvas = captchaCanvasRef.current;
@@ -331,7 +340,6 @@ function Logins() {
         setLoading(true);
     
         try {
-            // Step 1: Verify username and password
             const loginResponse = await axios.post(`${localStorage.getItem("url")}login.php`, {
                 operation: "login",
                 json: { 
@@ -342,7 +350,19 @@ function Logins() {
     
             if (loginResponse.data.status === "success") {
                 const userData = loginResponse.data.data;
+                
+                // Set initial activity timestamp using the centralized function
+                updateLastActivity();
+                
+                // Set encrypted session cookie with 5-minute expiry
+                setSessionCookie('userSession', {
+                    user_id: userData.user_id,
+                    school_id: userData.school_id,
+                    user_level: userData.user_level_name,
+                    timestamp: new Date().getTime() // Add timestamp for additional security
+                });
     
+                // Continue with existing login flow...
                 // Step 2: Check if 2FA is active
                 const is2FAactive = userData.is_2FAactive === "1";
     
@@ -514,6 +534,7 @@ function Logins() {
             }
         } catch (error) {
             console.error('Login error:', error);
+            removeSessionCookie('userSession');
             notify("Login failed. Please try again.", 'error');
             generateCaptcha();
         } finally {

@@ -77,29 +77,17 @@ const Faculty = () => {
         setLoading(true);
         try {
             const response = await axios.post("http://localhost/coc/gsd/user.php", 
-                { operation: "fetchAllUser" },  // Changed to use JSON
-                { 
-                    headers: { 'Content-Type': 'application/json' }
-                }
+                { operation: "fetchAllUser" },
+                { headers: { 'Content-Type': 'application/json' } }
             );
 
             if (response.data.status === 'success') {
-                // Transform the data to ensure all user types are included
-                const allUsers = response.data.data.map(user => ({
-                    users_id: user.id,
-                    users_fname: user.fname,
-                    users_mname: user.mname,
-                    users_lname: user.lname,
-                    users_email: user.email,
-                    users_school_id: user.school_id,
-                    users_contact_number: user.contact_number,
-                    users_pic: user.pic,
-                    departments_name: user.departments_name,
-                    user_level_name: user.user_level_name,
-                    users_user_level_id: user.user_level_desc,
-                    user_type: user.type
+                // Transform the data to match the DataTable structure
+                const transformedUsers = response.data.data.map(user => ({
+                    ...user,  // Spread all existing user properties
+                    departments_name: user.departments_name || 'No Department'
                 }));
-                setUsers(allUsers);
+                setUsers(transformedUsers);
             } else {
                 toast.error("Error fetching users: " + response.data.message);
             }
@@ -169,125 +157,35 @@ const Faculty = () => {
 
     const getUserDetails = async (userId) => {
         try {
-            // Try fetching driver first
-            const driverResponse = await axios.post(
+            const response = await axios.post(
                 'http://localhost/coc/gsd/fetchMaster.php',
-                JSON.stringify({
-                    operation: 'fetchDriverById',
-                    id: userId
-                }),
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (driverResponse.data.status === 'success' && driverResponse.data.data.length > 0) {
-                const driverData = driverResponse.data.data[0];
-                return {
-                    users_id: driverData.driver_id,
-                    users_fname: driverData.driver_full_name.split(' ')[0],
-                    users_mname: driverData.driver_full_name.split(' ')[1] || '',
-                    users_lname: driverData.driver_full_name.split(' ')[2] || '',
-                    users_email: driverData.driver_email,
-                    users_school_id: driverData.driver_school_id,
-                    users_contact_number: driverData.driver_contact_number,
-                    users_user_level_id: driverData.driver_user_level_id,
-                    departments_name: driverData.departments_name,
-                    user_level_name: driverData.user_level_name,
-                    users_pic: driverData.driver_pic,
-                    type: 'driver'
-                };
-            }
-
-            // If no driver found, continue with existing admin, dean/secretary, and user checks
-            // Try fetching admin first
-            const adminResponse = await axios.post(
-                'http://localhost/coc/gsd/fetchMaster.php',
-                JSON.stringify({
-                    operation: 'fetchAdminById',
-                    id: userId
-                }),
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (adminResponse.data.status === 'success' && adminResponse.data.data.length > 0) {
-                const adminData = adminResponse.data.data[0];
-                return {
-                    users_id: adminData.admin_id,
-                    users_fname: adminData.admin_fname,
-                    users_mname: adminData.admin_mname,
-                    users_lname: adminData.admin_lname,
-                    users_email: adminData.admin_email,
-                    users_school_id: adminData.admin_school_id,
-                    users_contact_number: adminData.admin_contact_number,
-                    users_user_level_id: adminData.admin_user_level_id,
-                    departments_name: adminData.departments_name,
-                    user_level_name: adminData.user_level_name,
-                    users_pic: adminData.admin_pic,
-                    type: 'admin'
-                };
-            }
-
-            // If no admin found, try fetching dean/secretary
-            const deanSecResponse = await axios.post(
-                'http://localhost/coc/gsd/fetchMaster.php',
-                JSON.stringify({
-                    operation: 'fetchDeanSecById',
-                    id: userId
-                }),
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            if (deanSecResponse.data.status === 'success' && deanSecResponse.data.data.length > 0) {
-                const deanData = deanSecResponse.data.data[0];
-                return {
-                    users_id: deanData.dept_id,
-                    users_fname: deanData.dept_fname,
-                    users_mname: deanData.dept_mname,
-                    users_lname: deanData.dept_lname,
-                    users_email: deanData.dept_email,
-                    users_school_id: deanData.dept_school_id,
-                    users_contact_number: deanData.dept_contact_number,
-                    users_user_level_id: deanData.dept_user_level_id,
-                    departments_name: deanData.departments_name,
-                    user_level_name: deanData.user_level_name,
-                    users_pic: deanData.dept_pic,
-                    type: 'dean'
-                };
-            }
-
-            // If no dean/secretary found, try fetching regular users
-            const userResponse = await axios.post(
-                'http://localhost/coc/gsd/fetchMaster.php',
-                JSON.stringify({
+                { 
                     operation: 'fetchUsersById',
-                    id: userId
-                }),
-                {
-                    headers: {
-                        'Content-Type': 'application/json'
-                    }
+                    id: userId 
+                },
+                { 
+                    headers: { 'Content-Type': 'application/json' } 
                 }
             );
 
-            if (userResponse.data.status === 'success' && userResponse.data.data.length > 0) {
-                const userData = userResponse.data.data[0];
+            console.log('User details response:', response.data); // Debug log
+
+            if (response.data.status === 'success' && response.data.data.length > 0) {
+                const userData = response.data.data[0];
+                // Return the exact field names from the API
                 return {
-                    type: 'user',
-                    ...userData
+                    users_id: userData.users_id,
+                    users_fname: userData.users_fname,      // Keep original API field names
+                    users_mname: userData.users_mname,      // Keep original API field names
+                    users_lname: userData.users_lname,      // Keep original API field names
+                    users_email: userData.users_email,
+                    users_school_id: userData.users_school_id,
+                    users_contact_number: userData.users_contact_number,
+                    users_user_level_id: userData.users_user_level_id,
+                    departments_name: userData.departments_name,
+                    users_pic: userData.users_pic
                 };
             }
-
             throw new Error('User not found');
         } catch (error) {
             console.error('Error fetching user details:', error);
@@ -298,14 +196,13 @@ const Faculty = () => {
 
     // Add to useEffect
     useEffect(() => {
-        fetchDepartments();
-        fetchUsers();
-        fetchUserLevels(); // Add this line
+        const initializePage = async () => {
+            await fetchDepartments();
+            await fetchUserLevels();
+            await fetchUsers();
+        };
+        initializePage();
     }, []);
-
-    useEffect(() => {
-        fetchUsers();
-    }, []); // Add this useEffect to fetch users on mount
 
     const handleSubmit = async (jsonData) => {
         const operation = jsonData.data.users_id ? "updateUser" : "saveUser";
@@ -820,65 +717,27 @@ const FacultyModal = ({
     useEffect(() => {
         const fetchUserData = async () => {
             if (user && type === 'edit') {
-                console.log('Modal user prop:', user);
+                console.log('Fetching user details for ID:', user.users_id);
+                const userDetails = await getUserDetails(user.users_id);
+                console.log('Fetched user details:', userDetails); // Debug log
                 
-                let userDetails;
-                if (user.type === 'driver') {
-                    // Fetch driver details
-                    const response = await axios.post(
-                        'http://localhost/coc/gsd/fetchMaster.php',
-                        new URLSearchParams({
-                            operation: 'fetchDriverById',
-                            id: user.users_id
-                        }),
-                        {
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded'
-                            }
-                        }
-                    );
-                    
-                    if (response.data.status === 'success') {
-                        userDetails = response.data.data[0];
-                        // Map driver data to form fields
-                        const nameParts = userDetails.driver_full_name.split(' ');
-                        const formDataToSet = {
-                            users_id: userDetails.driver_id,
-                            users_firstname: nameParts[0] || '',
-                            users_middlename: nameParts[1] || '',
-                            users_lastname: nameParts[2] || '',
-                            users_school_id: userDetails.driver_school_id,
-                            users_contact_number: userDetails.driver_contact_number,
-                            users_email: userDetails.driver_email,
-                            departments_name: userDetails.departments_name,
-                            users_password: '',
-                            users_role: userDetails.driver_user_level_id
-                        };
-                        setFormData(formDataToSet);
-                    }
-                } else {
-                    // Handle regular user data
-                    userDetails = await getUserDetails(user.users_id);
-                    if (userDetails) {
-                        const formDataToSet = {
-                            users_id: userDetails.users_id,
-                            users_firstname: userDetails.users_fname,
-                            users_middlename: userDetails.users_mname,
-                            users_lastname: userDetails.users_lname,
-                            users_school_id: userDetails.users_school_id,
-                            users_contact_number: userDetails.users_contact_number,
-                            users_email: userDetails.users_email,
-                            departments_name: userDetails.departments_name,
-                            users_password: '',
-                            users_role: userDetails.users_user_level_id
-                        };
-                        setFormData(formDataToSet);
-                    }
-                }
+                if (userDetails) {
+                    setFormData({
+                        users_id: userDetails.users_id,
+                        users_firstname: userDetails.users_fname,    // Match API field names
+                        users_middlename: userDetails.users_mname,  // Match API field names
+                        users_lastname: userDetails.users_lname,    // Match API field names
+                        users_email: userDetails.users_email,
+                        users_school_id: userDetails.users_school_id,
+                        users_contact_number: userDetails.users_contact_number,
+                        users_role: userDetails.users_user_level_id,
+                        departments_name: userDetails.departments_name,
+                        users_password: ''
+                    });
 
-                // Set image URL if available
-                if (userDetails && userDetails.driver_pic) {
-                    setImageUrl(`http://localhost/coc/gsd/${userDetails.driver_pic}`);
+                    if (userDetails.users_pic) {
+                        setImageUrl(`http://localhost/coc/gsd/${userDetails.users_pic}`);
+                    }
                 }
             } else {
                 // Reset form for new user
@@ -1035,21 +894,10 @@ const FacultyModal = ({
         } else {
             // Handle insert (existing code for new user)
             let operation;
-            switch (formData.users_role) {
-                case '1':
-                    operation = 'saveAdmin';
-                    break;
-                case '2':
-                    operation = 'savePersonnel';
-                    break;
-                case '5':
-                    operation = 'saveDean';
-                    break;
-                case '13':
-                    operation = 'saveDriver';
-                    break;
-                default:
-                    operation = 'saveUser';
+            if (formData.users_role === '13') {
+                operation = 'saveUser';
+            } else {
+                operation = 'saveUser';
             }
 
             if (formData.users_role === '13') {
@@ -1064,23 +912,6 @@ const FacultyModal = ({
                         password: formData.users_password,
                         departmentId: selectedDepartment.departments_id,
                         pic: ""
-                    }
-                };
-            } else if (formData.users_role === '2') {
-                // Add new case for Personnel
-                jsonData = {
-                    operation: operation,
-                    data: {
-                        firstName: formData.users_firstname,
-                        middleName: formData.users_middlename,
-                        lastName: formData.users_lastname,
-                        contact: formData.users_email,
-                        schoolId: formData.users_school_id,
-                        contactNumber: formData.users_contact_number,
-                        userLevelId: formData.users_role,
-                        password: formData.users_password,
-                        departmentId: selectedDepartment.departments_id,
-                        pic: "" // Add pic handling if needed
                     }
                 };
             } else {

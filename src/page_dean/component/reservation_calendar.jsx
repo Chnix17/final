@@ -150,12 +150,15 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
   const fetchReservations = async () => {
     setIsLoading(true);
     try {
+      // Ensure selectedResource.id is treated as an array
+      const itemIds = Array.isArray(selectedResource.id) ? selectedResource.id : [selectedResource.id];
+      
       const response = await axios.post(
         'http://localhost/coc/gsd/user.php',
         {
           operation: 'fetchAvailability',
           itemType: selectedResource.type,
-          itemId: selectedResource.id
+          itemId: itemIds
         },
         {
           headers: {
@@ -163,15 +166,15 @@ const ReservationCalendar = ({ onDateSelect, selectedResource }) => {
           }
         }
       );
-
+  
       if (response.data.status === 'success') {
         const formattedReservations = response.data.data.map(res => ({
           id: res.reservation_form_venue_id || res.reservation_form_vehicle_id,
-          startDate: new Date(res.reservation_form_start_date),
-          endDate: new Date(res.reservation_form_end_date),
+          startDate: new Date(res.reservation_start_date),
+          endDate: new Date(res.reservation_end_date),
           status: res.reservation_status_status_id,
           isReserved: res.reservation_status_status_id === '6',
-          name: res.ven_name // Venue name if available
+          venueName: res.ven_name // Store venue name
         }));
         setReservations(formattedReservations);
       }
@@ -280,30 +283,50 @@ const getAvailabilityStatus = (date, allReservations) => {
     return 'holiday';
   }
 
-  // Filter reservations for the current date
-  const dayReservations = allReservations.filter(res => {
-    if (!res.isReserved) return false;
+  // If there are no reservations, the date is fully available
+  if (!allReservations.length) {
+    return 'available';
+  }
+
+  // Group reservations by venue for the current date
+  const venueReservations = new Map();
+  
+  allReservations.forEach(res => {
+    if (!res.isReserved) return;
 
     const resStart = new Date(res.startDate);
     const resEnd = new Date(res.endDate);
     resStart.setHours(0, 0, 0, 0);
-    resEnd.setHours(0, 0, 0, 0);
+    resEnd.setHours(23, 59, 59, 999);
     
-    return compareDate >= resStart && compareDate <= resEnd;
+    if (compareDate >= resStart && compareDate <= resEnd) {
+      if (!venueReservations.has(res.venueName)) {
+        venueReservations.set(res.venueName, []);
+      }
+      venueReservations.get(res.venueName).push({
+        ...res,
+        startHour: new Date(res.startDate).getHours(),
+        endHour: new Date(res.endDate).getHours()
+      });
+    }
   });
 
-  if (dayReservations.length === 0) {
-    return 'available';
+  // Check for full-day reservations (5AM to 7PM)
+  const hasFullDayReservation = Array.from(venueReservations.values()).some(venueRes => 
+    venueRes.some(res => 
+      res.startHour <= 5 && res.endHour >= 19
+    )
+  );
+
+  // If any venue has a full-day reservation, mark as reserved
+  if (hasFullDayReservation) {
+    return 'reserved';
   }
 
-  // Check if any reservation covers the entire business hours (5AM to 7PM)
-  const hasFullDayReservation = dayReservations.some(res => {
-    const resStart = new Date(res.startDate);
-    const resEnd = new Date(res.endDate);
-    return resStart.getHours() <= 5 && resEnd.getHours() >= 19;
-  });
+  // Check if there are any partial reservations
+  const hasPartialReservations = venueReservations.size > 0;
 
-  return hasFullDayReservation ? 'reserved' : 'partial';
+  return hasPartialReservations ? 'partial' : 'available';
 };
 
 // Add new function to get business hours status

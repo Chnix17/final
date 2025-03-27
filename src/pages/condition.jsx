@@ -65,7 +65,15 @@ const Conditions = () => {
 
     const confirmDelete = async () => {
         try {
-            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', new URLSearchParams({ operation: 'deleteCondition', condition_id: selectedConditionId }));
+            const response = await axios.post('http://localhost/coc/gsd/delete_master.php', {
+                operation: 'deleteCondition',
+                conditionId: selectedConditionId
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.data.status === 'success') {
                 setConditions(conditions.filter(condition => condition.condition_id !== selectedConditionId));
                 toast.success('Condition deleted successfully!');

@@ -85,9 +85,12 @@ const VehicleMakes = () => {
       const response = await fetch('http://localhost/coc/gsd/delete_master.php', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({ operation: 'deleteVehicleMake', vehicle_make_id: selectedMakeId }),
+        body: JSON.stringify({ 
+          operation: 'deleteVehicleMake', 
+          vehicle_make_id: selectedMakeId 
+        }),
       });
 
       const data = await response.json();
